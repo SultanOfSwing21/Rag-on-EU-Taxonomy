@@ -45,3 +45,4 @@ DEFAULT_FAQ_PATH = PROJECT_ROOT / _FAQ_RELATIVE
 DEFAULT_CHUNKS_CACHE = PROJECT_ROOT / ".cache" / "chunks.jsonl"
 DEFAULT_INDEX_DIR = PROJECT_ROOT / ".cache" / "index"
 DEFAULT_EVAL_DB = _resolve_eval_db()
+DOCS_DOCUMENTATION_DIR = PROJECT_ROOT / "docs" / "documentation"

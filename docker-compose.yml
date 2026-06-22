@@ -1,3 +1,15 @@
+# EU Taxonomy RAG — Streamlit (port 8501)
+#
+# Données persistées sur l'hôte (bind mounts) :
+#   ./.cache                         → chunks FAQ, index BM25/dense, SQLite generation_eval.db
+#   ./data/evaluation/results      → exports JSON des benchmarks retrieval
+#
+# Volume Docker nommé :
+#   hf-cache                         → cache Hugging Face (modèles d'embedding, NLI)
+#
+# Sans ces montages, les résultats d'évaluation et la base SQLite sont perdus
+# à la suppression du conteneur. Voir aussi le Dockerfile (section Persistance).
+
 name: eu-taxonomy-rag
 
 services:
@@ -13,11 +25,16 @@ services:
       ENABLE_GENERATION_EVAL: "true"
       EU_TAXONOMY_EMBEDDING_DEVICE: cpu
     volumes:
+      # Chunks, index BM25/dense, base SQLite d'évaluation (generation_eval.db)
       - ./.cache:/app/.cache
+      # Exports JSON des benchmarks retrieval (onglet Benchmark)
+      - ./data/evaluation/results:/app/data/evaluation/results
+      # Modèles Hugging Face (volume nommé, voir section volumes ci-dessous)
       - hf-cache:/root/.cache/huggingface
     env_file:
       - path: .env
         required: false
 
 volumes:
+  # Cache des modèles Hugging Face (sentence-transformers, NLI) — survit aux rebuilds d'image
   hf-cache:

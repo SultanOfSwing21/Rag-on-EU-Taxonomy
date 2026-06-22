@@ -10,5 +10,9 @@ __pycache__
 .env
 Instructions
 tests
-docs
+# Résultats de benchmark persistés via volume (docker-compose) — pas dans l'image
 data/evaluation/results
+# docs/ dev hors UI ; documentation in-app incluse via !docs/documentation
+docs/*
+!docs/documentation
+!docs/documentation/**

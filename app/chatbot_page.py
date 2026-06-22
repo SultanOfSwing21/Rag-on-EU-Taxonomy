@@ -205,7 +205,7 @@ def _save_credentials_to_env() -> None:
     write_env_file(updates)
     for widget_key in _SECRET_WIDGET_KEYS.values():
         st.session_state.pop(widget_key, None)
-    st.toast("Credentials saved to `.env`.", icon="✅")
+    st.toast("Credentials saved.", icon="✅")
     st.rerun()
 
 
@@ -215,7 +215,7 @@ def _save_chatbot_defaults_to_env() -> None:
     write_env_file(updates)
     for widget_key in _SECRET_WIDGET_KEYS.values():
         st.session_state.pop(widget_key, None)
-    st.toast("Chatbot defaults saved to `.env`.", icon="✅")
+    st.toast("Chatbot defaults saved.", icon="✅")
     st.rerun()
 
 
@@ -283,10 +283,10 @@ def render_connection_tab() -> None:
 
     c_save, c_reload = st.columns(2)
     with c_save:
-        if st.button("Save credentials to .env", key="save_credentials_btn", use_container_width=True):
+        if st.button("Save credentials", key="save_credentials_btn", use_container_width=True):
             _save_credentials_to_env()
     with c_reload:
-        if st.button("Reload from .env", key="reload_credentials_btn", use_container_width=True):
+        if st.button("Reload", key="reload_credentials_btn", use_container_width=True):
             reload_chatbot_settings_from_env()
 
 
@@ -327,10 +327,10 @@ def render_parameters_tab(available_methods: list[RetrievalMethod]) -> None:
 
     c_save, c_reload = st.columns(2)
     with c_save:
-        if st.button("Save defaults to .env", key="save_defaults_btn", use_container_width=True):
+        if st.button("Save defaults", key="save_defaults_btn", use_container_width=True):
             _save_chatbot_defaults_to_env()
     with c_reload:
-        if st.button("Reload from .env", key="reload_defaults_btn", use_container_width=True):
+        if st.button("Reload", key="reload_defaults_btn", use_container_width=True):
             reload_chatbot_settings_from_env()
 
 

@@ -1,4 +1,15 @@
 # syntax=docker/dockerfile:1
+#
+# Image applicative EU Taxonomy RAG (Streamlit + pipeline RAG).
+# Les jeux d'évaluation versionnés (golden, natural) sont copiés dans l'image via COPY data/.
+# La documentation in-app (onglet Documentation, page d'accueil) via COPY docs/documentation/.
+#
+# Persistance (non incluse dans l'image — montée par docker-compose.yml) :
+#   /app/.cache                      chunks.jsonl, index/, generation_eval.db (SQLite)
+#   /app/data/evaluation/results     exports JSON des benchmarks retrieval
+#   /root/.cache/huggingface         modèles téléchargés (volume nommé hf-cache)
+#
+# Démarrage : docker compose up --build  →  http://localhost:8501
 
 FROM python:3.11-slim
 
@@ -25,7 +36,11 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 # Layer 2 — application source (code changes do not reinstall Python dependencies)
 COPY src ./src
 COPY app ./app
+# Jeux d'évaluation versionnés (golden, natural) — les résultats de benchmark
+# sont écrits dans data/evaluation/results/ et doivent être montés en volume (voir docker-compose.yml).
 COPY data ./data
+# Markdown servi par l'onglet Documentation et la page d'accueil (home.md)
+COPY docs/documentation ./docs/documentation
 COPY scripts ./scripts
 
 ENV EU_TAXONOMY_PROJECT_ROOT=/app \

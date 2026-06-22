@@ -11,6 +11,8 @@ import streamlit as st
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from chatbot_page import ensure_chatbot_settings_loaded, render_chatbot_page
+from documentation_page import render_documentation_page
+from home_page import render_home_page
 
 from eu_taxonomy_rag.evaluation.generation_eval import is_generation_eval_enabled
 
@@ -55,6 +57,20 @@ AVAILABLE_METHODS = available_retrieval_methods()
 METHOD_OPTIONS = [(method.value, method_label(method.value)) for method in AVAILABLE_METHODS]
 DEFAULT_METHOD_VALUES = [method.value for method in AVAILABLE_METHODS]
 INDEX_DIR = DEFAULT_INDEX_DIR
+MAIN_NAV_KEY = "main_navigation"
+NAV_PAGES = (
+    "Home",
+    "Chatbot",
+    "Benchmark",
+    "Interactive test",
+    "Data explorer",
+    "Documentation",
+)
+
+
+def navigate_to(page: str) -> None:
+    if page in NAV_PAGES:
+        st.session_state[MAIN_NAV_KEY] = page
 
 
 def render_environment_notice() -> None:
@@ -792,11 +808,9 @@ def page_saved_results() -> None:
 def main() -> None:
     ensure_chatbot_settings_loaded()
 
-    st.title("EU Taxonomy RAG")
-    st.markdown(
-        "### Retrieval evaluation, data exploration, and **RAG chatbot** for EU Taxonomy FAQs."
-    )
-    st.divider()
+    if MAIN_NAV_KEY not in st.session_state:
+        st.session_state[MAIN_NAV_KEY] = "Home"
+
     render_environment_notice()
 
     if is_generation_eval_enabled():
@@ -808,15 +822,30 @@ def main() -> None:
 
     page = st.sidebar.radio(
         "Navigation",
-        options=["Chatbot", "Benchmark", "Interactive test", "Data explorer"] #, "Saved results"],
+        options=list(NAV_PAGES),
+        key=MAIN_NAV_KEY,
     )
-    st.sidebar.divider()
-    st.sidebar.markdown("**Available datasets**")
-    for spec in AVAILABLE_DATASETS:
-        status = "✅" if spec.exists else "❌"
-        st.sidebar.caption(f"{status} {spec.label}")
+    #st.sidebar.divider()
+    #st.sidebar.markdown("**Available datasets**")
+    #for spec in AVAILABLE_DATASETS:
+    #    status = "✅" if spec.exists else "❌"
+    #    st.sidebar.caption(f"{status} {spec.label}")
 
-    if page == "Chatbot":
+    if page != "Home":
+        st.title("EU Taxonomy RAG")
+        st.markdown(
+            "Retrieval-augmented Q&A on official EU Taxonomy FAQs — with retrieval benchmarking, "
+            "faithfulness evaluation, and interactive exploration."
+        )
+        st.divider()
+
+    if page == "Home":
+        try:
+            chunk_count = len(get_chunks())
+        except Exception:
+            chunk_count = None
+        render_home_page(navigate_to=navigate_to, num_chunks=chunk_count)
+    elif page == "Chatbot":
         render_chatbot_page(
             get_chunks=get_chunks,
             indexes_ready_for_methods=indexes_ready_for_methods,
@@ -830,8 +859,8 @@ def main() -> None:
         page_interactive()
     elif page == "Data explorer":
         page_data_explorer()
-    else:
-        page_saved_results()
+    elif page == "Documentation":
+        render_documentation_page()
 
 
 if __name__ == "__main__":
