@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import pytest
+import sqlite3
 
 from eu_taxonomy_rag.evaluation.generation_eval import (
     ClaimEvaluation,
@@ -186,3 +187,16 @@ def test_init_evaluation_db_is_idempotent(tmp_path: Path) -> None:
     init_evaluation_db(db_path)
     init_evaluation_db(db_path)
     assert db_path.exists()
+
+
+def test_init_evaluation_db_creates_parent_directory(tmp_path: Path) -> None:
+    db_path = tmp_path / "nested" / "cache" / "eval.db"
+    init_evaluation_db(db_path)
+    assert db_path.exists()
+
+
+def test_init_evaluation_db_rejects_directory_path(tmp_path: Path) -> None:
+    db_path = tmp_path / "eval.db"
+    db_path.mkdir()
+    with pytest.raises(sqlite3.OperationalError, match="is a directory"):
+        init_evaluation_db(db_path)

@@ -14,7 +14,7 @@ from chatbot_page import ensure_chatbot_settings_loaded, render_chatbot_page
 
 from eu_taxonomy_rag.evaluation.generation_eval import is_generation_eval_enabled
 
-from eu_taxonomy_rag.paths import DEFAULT_EVAL_DB, DEFAULT_INDEX_DIR, PROJECT_ROOT
+from eu_taxonomy_rag.paths import DEFAULT_INDEX_DIR, PROJECT_ROOT
 from eu_taxonomy_rag.evaluation.dashboard import (
     AVAILABLE_DATASETS,
     METRIC_COLUMNS,
@@ -64,7 +64,7 @@ def render_environment_notice() -> None:
 
     st.sidebar.caption(f"Dense backend: **{dense_index_backend()}**")
 
-    if is_sentence_transformers_available():
+    if is_sentence_transformers_availablegiy ():
         from eu_taxonomy_rag.retrieval.embeddings import embedding_device
 
         st.sidebar.caption(f"Embedding device: **{embedding_device()}**")
@@ -96,11 +96,9 @@ def filter_selected_methods(method_values: list[str]) -> list[RetrievalMethod]:
 
 @st.cache_resource(show_spinner="Preparing FAQ chunks…")
 def bootstrap_application():
-    """Build chunks and evaluation storage once per session (indexes are built manually)."""
+    """Build FAQ chunks once per session (indexes are built manually)."""
     from eu_taxonomy_rag.pipelines.ingestion import run_ingestion
-    from eu_taxonomy_rag.storage.evaluation_store import init_evaluation_db
 
-    init_evaluation_db(DEFAULT_EVAL_DB)
     return run_ingestion(build_indexes=False)
 
 

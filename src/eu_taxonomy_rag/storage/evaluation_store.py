@@ -220,8 +220,26 @@ def records_to_kpi_dataframe(
 
 
 def _connect(db_path: Path) -> sqlite3.Connection:
-    db_path.parent.mkdir(parents=True, exist_ok=True)
-    connection = sqlite3.connect(db_path)
+    path = Path(db_path).expanduser().resolve()
+    if path.exists() and path.is_dir():
+        raise sqlite3.OperationalError(
+            f"unable to open database file: `{path}` is a directory, not a SQLite file"
+        )
+
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+    except OSError as exc:
+        raise sqlite3.OperationalError(
+            f"unable to open database file: cannot create parent directory `{path.parent}`"
+        ) from exc
+
+    try:
+        connection = sqlite3.connect(str(path))
+    except sqlite3.OperationalError as exc:
+        raise sqlite3.OperationalError(
+            f"unable to open database file at `{path}` ({exc})"
+        ) from exc
+
     connection.row_factory = sqlite3.Row
     return connection
 
