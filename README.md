@@ -1,125 +1,243 @@
 # Rag-on-EU-Taxonomy
 
-Small training RAG on the EU Taxonomy FAQs. The goal is to design and implement the best candidate for a simple chat bot aiming at retrieving relevant information on the EU Taxonomy.
+Petit RAG d'entraînement sur les FAQ de l'EU Taxonomy. L'objectif est de concevoir et implémenter un chatbot simple capable de retrouver des informations pertinentes sur l'EU Taxonomy.
 
-## Quick start
+## Prérequis
 
-**Requirements:** Python 3.10–3.12
+- **Python 3.10, 3.11 ou 3.12** (recommandé : 3.11)
+- **Git**
+- Connexion internet pour le premier lancement (téléchargement des modèles d'embedding et, optionnellement, du modèle NLI)
 
-### Option A (recommended)
+Aucune clé API n'est requise pour démarrer l'application. Les onglets Benchmark, Interactive test et Data explorer fonctionnent sans LLM.
 
-```bash
+## Installation locale
+
+### Windows (PowerShell)
+
+```powershell
+git clone <url-du-repo>
+cd "RAG - Implementation"
+
 py -3.11 -m venv .venv
-.venv\Scripts\Activate.ps1
+.\.venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip
 pip install -e ".[ui]"
 eu-taxonomy-rag
 ```
 
-On macOS/Linux, activate the venv with `source .venv/bin/activate` instead of the PowerShell line above.
+Si `py -3.11` n'est pas reconnu, installez Python depuis [python.org](https://www.python.org/downloads/) en cochant **Add Python to PATH**, puis relancez les commandes ci-dessus.
 
-### Option B — one command
+### macOS
 
 ```bash
+git clone <url-du-repo>
+cd "RAG - Implementation"
+
+python3.11 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+pip install -e ".[ui]"
+eu-taxonomy-rag
+```
+
+Sur macOS avec Homebrew : `brew install python@3.11` si besoin.
+
+### Linux
+
+```bash
+git clone <url-du-repo>
+cd "RAG - Implementation"
+
+python3.11 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+pip install -e ".[ui]"
+eu-taxonomy-rag
+```
+
+Sur Debian/Ubuntu : `sudo apt install python3.11 python3.11-venv` si besoin.
+
+### macOS / Linux — une seule commande
+
+```bash
+chmod +x scripts/start.sh
 ./scripts/start.sh
 ```
 
-The launcher will automatically:
+Ce script installe le package en mode éditable avec l'interface Streamlit, puis lance l'application.
 
-1. Build FAQ **chunks** from `data/taxonomy_faqs_cleaned.md` (cached in `.cache/chunks.jsonl`)
-2. Initialize the **generation evaluation** SQLite database (`.cache/generation_eval.db`)
-3. Open the **Streamlit** dashboard in your browser
+## Installation Docker
 
-On first use, open the **Benchmark** page and click **Build indexes** to create retrieval indexes (BM25 + dense). This step downloads embedding models and may take several minutes; later runs reuse `.cache/index/`.
+Le dépôt inclut un `Dockerfile` et un `docker-compose.yml`.
 
-### LLM credentials (Chatbot tab only, optional)
-
-No `.env` file is required to start the app. Benchmark, interactive test, and data explorer work without any LLM key.
-
-To use the **Chatbot** tab, either:
-
-- copy the template and add a provider key:
+### Avec Docker Compose (recommandé)
 
 ```bash
+git clone <url-du-repo>
+cd "RAG - Implementation"
+
+# Optionnel : clés LLM pour l'onglet Chatbot
 cp .env.example .env
-# then edit .env with your API key(s)
+# éditez .env si nécessaire
+# puis décommentez env_file dans docker-compose.yml
+
+docker compose up --build
 ```
 
-- or enter credentials in the UI and click **Save credentials to .env** (the app creates `.env` on first save).
+Ouvrez [http://localhost:8501](http://localhost:8501).
 
-### Optional extras
+Le cache (chunks, index de recherche, base d'évaluation) est persisté dans le volume Docker `rag-cache`, monté sur `/app/.cache`.
+
+### Avec Docker seul
 
 ```bash
-pip install -e ".[ui,faiss,dev]"   # FAISS dense index + tests
+docker build -t eu-taxonomy-rag .
+docker run --rm -p 8501:8501 \
+  -e EU_TAXONOMY_PROJECT_ROOT=/app \
+  -v eu-taxonomy-rag-cache:/app/.cache \
+  eu-taxonomy-rag
 ```
 
-## Streamlit pages
+> **Important :** montez le volume sur le répertoire `.cache`, pas sur le fichier `generation_eval.db`. Monter un répertoire vide à la place du fichier SQLite empêche l'ouverture de la base.
 
-| Page | Purpose |
-|------|---------|
-| **Chatbot** | RAG Q&A + groundedness evaluation |
-| **Benchmark** | Multi-dataset retrieval evaluation (Recall@K, MRR) |
-| **Interactive test** | Side-by-side retrieval comparison |
-| **Data explorer** | Browse chunks and evaluation datasets |
-| **Saved results** | Compare exported benchmark JSON files |
+## Premier lancement
 
-## Generation evaluation (groundedness)
+Quelle que soit la méthode d'installation, le lanceur :
 
-The chatbot can optionally evaluate each generated answer for **groundedness / faithfulness** against the retrieved FAQ chunks.
+1. Construit les **chunks** FAQ à partir de `data/taxonomy_faqs_cleaned.md` (mis en cache dans `.cache/chunks.jsonl`)
+2. Initialise la base SQLite d'**évaluation de génération** (`.cache/generation_eval.db`, créée à la première utilisation du chatbot)
+3. Ouvre le **tableau de bord Streamlit** dans le navigateur
 
-### What it does
+Ensuite, ouvrez l'onglet **Benchmark** et cliquez sur **Build indexes** pour créer les index de recherche (BM25 + dense). Cette étape télécharge les modèles d'embedding et peut prendre plusieurs minutes ; les lancements suivants réutilisent `.cache/index/`.
 
-After the LLM produces an answer, the app:
+### Commandes utiles
 
-1. Splits the answer into short atomic claims.
-2. Compares each claim to the retrieved chunks with a lightweight NLI model (`typeform/distilbert-base-uncased-mnli`).
-3. Labels each claim as `supported`, `contradicted`, or `not_enough_info`.
-4. Stores the interaction and scores in a local SQLite database (`.cache/generation_eval.db`).
-5. Displays per-answer metrics in the **Chat** tab and historical aggregates in **History** and **Metrics**.
+```bash
+eu-taxonomy-rag --bootstrap-only      # prépare les chunks sans ouvrir l'UI
+eu-taxonomy-rag --force-rebuild       # reconstruit les chunks depuis le fichier FAQ
+```
 
-### Metrics
+## Clés LLM (onglet Chatbot, optionnel)
 
-| Metric | Meaning |
-|--------|---------|
+Pour l'onglet **Chatbot**, fournissez une clé API via l'une des options suivantes :
+
+1. Copier le modèle et renseigner vos clés :
+
+   ```bash
+   cp .env.example .env
+   ```
+
+2. Saisir les identifiants dans l'interface et cliquer sur **Save credentials to .env** (le fichier `.env` est créé à la première sauvegarde).
+
+Providers supportés : OpenAI, Azure OpenAI, AWS Bedrock, API compatible OpenAI.
+
+## Dépendances optionnelles
+
+```bash
+pip install -e ".[ui,faiss,dev]"
+```
+
+| Extra | Contenu |
+|-------|---------|
+| `ui` | Streamlit, pandas, matplotlib (inclus dans les instructions ci-dessus) |
+| `faiss` | Index dense FAISS (sinon index NumPy par défaut) |
+| `dev` | pytest pour les tests |
+
+## Pages Streamlit
+
+| Page | Rôle |
+|------|------|
+| **Chatbot** | Q&R RAG + évaluation de groundedness |
+| **Benchmark** | Évaluation retrieval multi-jeux (Recall@K, MRR) |
+| **Interactive test** | Comparaison côte à côte des méthodes de retrieval |
+| **Data explorer** | Exploration des chunks et jeux d'évaluation |
+| **Saved results** | Comparaison des exports JSON de benchmark |
+
+## Évaluation de génération (groundedness)
+
+Le chatbot peut évaluer chaque réponse générée pour sa **fidélité au contexte** (groundedness / faithfulness) par rapport aux chunks FAQ récupérés.
+
+### Déroulement
+
+Après la génération LLM, l'application :
+
+1. Découpe la réponse en affirmations courtes.
+2. Compare chaque affirmation aux chunks récupérés avec un modèle NLI léger (`typeform/distilbert-base-uncased-mnli`).
+3. Étiquette chaque affirmation : `supported`, `contradicted` ou `not_enough_info`.
+4. Enregistre l'interaction dans SQLite (`.cache/generation_eval.db`).
+5. Affiche les métriques dans **Chat**, **History** et **Metrics**.
+
+### Métriques
+
+| Métrique | Signification |
+|----------|---------------|
 | **Faithfulness** | `supported_claims / total_claims` |
-| **Contradiction rate** | Share of claims classified as contradicted |
-| **Unsupported rate** | Share of claims with not enough information |
-| **Best / average claim score** | Max and mean entailment probability across claims |
-| **Score range** | Spread between best and worst claim entailment scores |
+| **Contradiction rate** | Part des affirmations contredites |
+| **Unsupported rate** | Part des affirmations sans information suffisante |
+| **Best / average claim score** | Score d'entailment max et moyen par affirmation |
+| **Score range** | Écart entre le meilleur et le pire score |
 
-### Enable / disable
+### Activer / désactiver
 
-Set in your environment or `.env`:
+Dans `.env` ou les variables d'environnement :
 
 ```bash
-ENABLE_GENERATION_EVAL=true   # default
-ENABLE_GENERATION_EVAL=false  # skip NLI evaluation and SQLite writes
+ENABLE_GENERATION_EVAL=true   # défaut
+ENABLE_GENERATION_EVAL=false  # désactive l'évaluation NLI et les écritures SQLite
 ```
 
-When disabled, the chatbot still retrieves and generates answers normally.
+### Limites
 
-### Limitations
+- Outil de **diagnostic**, pas un juge automatique parfait.
+- Le modèle NLI peut se tromper sur les paraphrases ou le vocabulaire métier.
+- Le découpage en affirmations est basé sur les phrases.
+- Les scores dépendent de la qualité du retrieval.
+- La première évaluation télécharge le modèle NLI (quelques secondes sur CPU).
 
-- This is a **diagnostic monitor**, not a perfect automatic judge.
-- NLI models can misclassify paraphrases, implicit reasoning, or domain-specific wording.
-- Claim splitting is sentence-based and may miss or over-split complex answers.
-- Scores depend on the quality of retrieved chunks; poor retrieval lowers faithfulness even when the LLM is cautious.
-- The first evaluation downloads the NLI model and may take a few seconds on CPU.
+## Variables d'environnement
 
-**Scoring notes:** each claim is matched against the **best** retrieved passage (answer text and sentence-level variants), not an aggregate across all chunks. Near-verbatim overlap with a chunk answer is detected lexically before NLI. Abstention replies (`I cannot answer this question from the available context.`) skip groundedness scoring.
+| Variable | Description | Défaut |
+|----------|-------------|--------|
+| `EU_TAXONOMY_PROJECT_ROOT` | Racine du projet (données, cache) | Détection auto (cwd ou emplacement du package) |
+| `EU_TAXONOMY_EVAL_DB` | Chemin de la base SQLite d'évaluation | `<PROJECT_ROOT>/.cache/generation_eval.db` |
+| `ENABLE_GENERATION_EVAL` | Active l'évaluation groundedness | `true` |
+| `EU_TAXONOMY_LLM_PROVIDER` | Fournisseur LLM du chatbot | — |
+| `EU_TAXONOMY_LLM_MODEL` | Modèle LLM | `gpt-4o-mini` |
+| `OPENAI_API_KEY` | Clé OpenAI | — |
 
-## Project layout
+Voir `.env.example` pour la liste complète des paramètres chatbot.
 
-- `app/streamlit_app.py` — main Streamlit dashboard
-- `app/chatbot_page.py` — RAG chatbot
-- `src/eu_taxonomy_rag/cli.py` — bootstrap + launch command
-- `src/eu_taxonomy_rag/evaluation/generation_eval.py` — NLI groundedness evaluation
-- `src/eu_taxonomy_rag/storage/evaluation_store.py` — SQLite persistence
+## Arborescence
 
-## Development
+```
+app/
+  streamlit_app.py       # tableau de bord principal
+  chatbot_page.py        # chatbot RAG
+  generation_eval_ui.py  # UI d'évaluation groundedness
+src/eu_taxonomy_rag/
+  cli.py                 # bootstrap + lancement Streamlit
+  paths.py               # chemins projet et cache
+  evaluation/            # benchmarks, métriques, NLI
+  storage/               # persistance SQLite
+data/
+  taxonomy_faqs_cleaned.md
+  evaluation/            # jeux golden et résultats exportés
+.cache/                  # chunks, index, base d'évaluation (généré localement)
+```
+
+## Développement
 
 ```bash
 pip install -e ".[ui,dev]"
 pytest
-eu-taxonomy-rag --bootstrap-only   # rebuild FAQ chunks without opening the UI
+eu-taxonomy-rag --bootstrap-only
 ```
+
+## Dépannage
+
+| Problème | Piste de résolution |
+|----------|---------------------|
+| `unable to open database file` | Vérifiez les droits d'écriture sur `.cache` ; en Docker, montez un volume sur `.cache` (pas sur le fichier `.db`) |
+| FAQ introuvable en Docker | Définissez `EU_TAXONOMY_PROJECT_ROOT=/app` |
+| `sentence-transformers` / torch | Utilisez Python 3.10–3.12 ; évitez 3.13+ |
+| Port 8501 occupé | `docker compose` : changez `8501:8501` ; local : Streamlit propose un autre port |
