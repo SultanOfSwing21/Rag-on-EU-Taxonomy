@@ -41,6 +41,7 @@ from eu_taxonomy_rag.pipelines.index_manager import (
     index_artifacts_for_methods,
     indexes_ready_for_methods,
 )
+from eu_taxonomy_rag.retrieval.embeddings import is_sentence_transformers_available
 from eu_taxonomy_rag.retrieval.retrieval_methods import RetrievalMethod, available_retrieval_methods
 from eu_taxonomy_rag.retrieval.retriever import Retriever
 
@@ -63,7 +64,7 @@ def render_environment_notice() -> None:
 
     st.sidebar.caption(f"Dense backend: **{dense_index_backend()}**")
 
-    if is_sentence_transformers_availablegiy ():
+    if is_sentence_transformers_available():
         from eu_taxonomy_rag.retrieval.embeddings import embedding_device
 
         st.sidebar.caption(f"Embedding device: **{embedding_device()}**")

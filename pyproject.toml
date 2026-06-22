@@ -1,7 +1,7 @@
 [project]
 name = "eu-taxonomy-rag"
 version = "0.1.0"
-description = "Chatbot RAG sur les FAQ de l'EU Taxonomy"
+description = "Chatbot RAG on EU Taxonomy FAQ"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
