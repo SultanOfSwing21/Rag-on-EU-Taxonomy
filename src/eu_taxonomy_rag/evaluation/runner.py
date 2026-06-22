@@ -19,6 +19,7 @@ from eu_taxonomy_rag.pipelines.index_manager import (
     DEFAULT_INDEX_DIR,
     build_bm25_index,
     build_dense_vector_index,
+    required_dense_keys_and_bm25,
     search_batch,
 )
 from eu_taxonomy_rag.retrieval.embeddings import release_embedding_models
@@ -26,8 +27,6 @@ from eu_taxonomy_rag.retrieval.retrieval_methods import (
     DENSE_MODELS,
     RetrievalMethod,
     dense_key_for_method,
-    is_dense_method,
-    is_hybrid_method,
     requires_sentence_transformers,
 )
 
@@ -36,6 +35,7 @@ DEFAULT_DATASET_PATH = GOLDEN_CLEANED_PATH
 ALL_RETRIEVAL_METHODS: tuple[RetrievalMethod, ...] = tuple(RetrievalMethod)
 
 ProgressCallback = Callable[[str, RetrievalMethod, int, int], None]
+IndexBuildProgressCallback = Callable[[str, int, int], None]
 
 
 @dataclass(frozen=True)
@@ -109,32 +109,32 @@ def build_indexes_for_methods(
     *,
     base_dir: str | Path = DEFAULT_INDEX_DIR,
     force_rebuild: bool = False,
+    progress_callback: IndexBuildProgressCallback | None = None,
 ) -> None:
     """Construit uniquement les index nécessaires aux méthodes demandées."""
-    dense_keys: set[str] = set()
-    needs_bm25 = False
-
-    for method in methods:
-        if method == RetrievalMethod.BM25:
-            needs_bm25 = True
-        elif is_dense_method(method) or is_hybrid_method(method):
-            dense_keys.add(dense_key_for_method(method))
-            if is_hybrid_method(method):
-                needs_bm25 = True
-
-    for dense_key in sorted(dense_keys):
-        build_dense_vector_index(
-            chunks,
-            dense_key,
-            base_dir=base_dir,
-            force_rebuild=force_rebuild,
-        )
+    dense_keys, needs_bm25 = required_dense_keys_and_bm25(methods)
+    steps: list[tuple[str, str]] = [(key, f"dense ({key})") for key in dense_keys]
     if needs_bm25:
-        build_bm25_index(
-            chunks,
-            base_dir=base_dir,
-            force_rebuild=force_rebuild,
-        )
+        steps.append(("bm25", "BM25"))
+
+    for step_index, (step_key, step_label) in enumerate(steps, start=1):
+        if progress_callback is not None:
+            progress_callback(step_label, step_index, len(steps))
+
+        if step_key == "bm25":
+            build_bm25_index(
+                chunks,
+                base_dir=base_dir,
+                force_rebuild=force_rebuild,
+            )
+        else:
+            build_dense_vector_index(
+                chunks,
+                step_key,
+                base_dir=base_dir,
+                force_rebuild=force_rebuild,
+            )
+
     release_embedding_models()
 
 

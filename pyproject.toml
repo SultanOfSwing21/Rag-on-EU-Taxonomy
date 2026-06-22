@@ -26,6 +26,9 @@ ui = [
     "matplotlib>=3.8.0",
 ]
 
+[project.scripts]
+eu-taxonomy-rag = "eu_taxonomy_rag.cli:main"
+
 [build-system]
 requires = ["setuptools>=61"]
 build-backend = "setuptools.build_meta"

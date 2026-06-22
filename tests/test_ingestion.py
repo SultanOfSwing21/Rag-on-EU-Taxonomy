@@ -52,6 +52,29 @@ def mock_embeddings(monkeypatch: pytest.MonkeyPatch) -> None:
     )
 
 
+def test_run_ingestion_skips_indexes_when_disabled(
+    tmp_path: Path,
+    sample_chunks: list[Chunk],
+) -> None:
+    faq_path = tmp_path / "faqs.md"
+    faq_path.write_text("# placeholder\n", encoding="utf-8")
+
+    chunks_cache = tmp_path / "chunks.jsonl"
+    index_dir = tmp_path / "index"
+    save_chunks(sample_chunks, chunks_cache)
+
+    result = run_ingestion(
+        faq_path=faq_path,
+        chunks_cache_path=chunks_cache,
+        index_dir=index_dir,
+        build_indexes=False,
+    )
+
+    assert result.chunk_count == 2
+    assert result.index_names == ()
+    assert not index_dir.exists() or not any(index_dir.iterdir())
+
+
 def test_run_ingestion_builds_chunks_and_indexes(
     tmp_path: Path,
     sample_chunks: list[Chunk],

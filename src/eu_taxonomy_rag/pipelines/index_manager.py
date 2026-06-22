@@ -1,5 +1,8 @@
+from dataclasses import dataclass
 from pathlib import Path
 
+from eu_taxonomy_rag.core.models import Chunk
+from eu_taxonomy_rag.paths import DEFAULT_INDEX_DIR
 from eu_taxonomy_rag.retrieval.bm25_index import Bm25Index
 from eu_taxonomy_rag.retrieval.dense_index import (
     DenseVectorIndex,
@@ -14,7 +17,6 @@ from eu_taxonomy_rag.retrieval.embeddings import (
     release_embedding_models,
 )
 from eu_taxonomy_rag.retrieval.hybrid import reciprocal_rank_fusion
-from eu_taxonomy_rag.core.models import Chunk
 from eu_taxonomy_rag.retrieval.retrieval_methods import (
     DENSE_MODELS,
     RetrievalMethod,
@@ -23,10 +25,80 @@ from eu_taxonomy_rag.retrieval.retrieval_methods import (
     is_hybrid_method,
 )
 
-DEFAULT_INDEX_DIR = Path(".cache/index")
-
 _dense_cache: dict[str, DenseVectorIndex] = {}
 _bm25_cache: Bm25Index | None = None
+
+
+@dataclass(frozen=True)
+class IndexArtifact:
+    """One on-disk retrieval index required by a set of methods."""
+
+    key: str
+    label: str
+    directory: Path
+
+    @property
+    def exists(self) -> bool:
+        if self.key == "bm25":
+            return _index_files_exist(self.directory)
+        return dense_index_files_exist(self.directory)
+
+
+def required_dense_keys_and_bm25(
+    methods: list[RetrievalMethod],
+) -> tuple[tuple[str, ...], bool]:
+    """Return dense model keys and whether BM25 is needed for the given methods."""
+    dense_keys: set[str] = set()
+    needs_bm25 = False
+
+    for method in methods:
+        if method == RetrievalMethod.BM25:
+            needs_bm25 = True
+        elif is_dense_method(method) or is_hybrid_method(method):
+            dense_keys.add(dense_key_for_method(method))
+            if is_hybrid_method(method):
+                needs_bm25 = True
+
+    return tuple(sorted(dense_keys)), needs_bm25
+
+
+def index_artifacts_for_methods(
+    methods: list[RetrievalMethod],
+    base_dir: str | Path = DEFAULT_INDEX_DIR,
+) -> list[IndexArtifact]:
+    """List the index directories required for the selected retrieval methods."""
+    dense_keys, needs_bm25 = required_dense_keys_and_bm25(methods)
+    artifacts: list[IndexArtifact] = []
+
+    for dense_key in dense_keys:
+        config = DENSE_MODELS[dense_key]
+        artifacts.append(
+            IndexArtifact(
+                key=f"dense_{dense_key}",
+                label=f"Dense ({config.model_name})",
+                directory=dense_index_directory(dense_key, base_dir),
+            )
+        )
+
+    if needs_bm25:
+        artifacts.append(
+            IndexArtifact(
+                key="bm25",
+                label="BM25",
+                directory=index_directory(RetrievalMethod.BM25, base_dir),
+            )
+        )
+
+    return artifacts
+
+
+def indexes_ready_for_methods(
+    methods: list[RetrievalMethod],
+    base_dir: str | Path = DEFAULT_INDEX_DIR,
+) -> bool:
+    """Return True when every required index already exists on disk."""
+    artifacts = index_artifacts_for_methods(methods, base_dir=base_dir)
+    return bool(artifacts) and all(artifact.exists for artifact in artifacts)
 
 
 def index_directory(method: RetrievalMethod, base_dir: str | Path = DEFAULT_INDEX_DIR) -> Path:

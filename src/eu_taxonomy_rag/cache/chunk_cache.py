@@ -4,9 +4,10 @@ from pathlib import Path
 from eu_taxonomy_rag.core.chunker import build_chunks
 from eu_taxonomy_rag.core.models import Chunk
 from eu_taxonomy_rag.core.parser import parse_faq_file
+from eu_taxonomy_rag.paths import DEFAULT_CHUNKS_CACHE, DEFAULT_FAQ_PATH
 
-DEFAULT_FAQ_PATH = Path("data/taxonomy_faqs_cleaned.md")
-DEFAULT_CACHE_PATH = Path(".cache/chunks.jsonl")
+# Backward-compatible aliases
+DEFAULT_CACHE_PATH = DEFAULT_CHUNKS_CACHE
 
 
 def load_or_build_chunks(

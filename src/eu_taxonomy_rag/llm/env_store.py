@@ -176,6 +176,40 @@ def session_values_from_env(parsed: dict[str, str] | None = None) -> dict[str, A
     return values
 
 
+def apply_session_defaults(session_state: Any) -> None:
+    """Ensure chatbot widget keys exist with typed defaults."""
+    for key, default in SESSION_DEFAULTS.items():
+        session_state.setdefault(key, default)
+    coerce_chatbot_session_types(session_state)
+
+
+def coerce_chatbot_session_types(session_state: Any) -> None:
+    """Coerce numeric chatbot settings when session state contains invalid types."""
+    for session_key, default in SESSION_DEFAULTS.items():
+        if session_key in CREDENTIAL_ENV_VARS:
+            continue
+        value = session_state.get(session_key, default)
+        try:
+            if isinstance(default, float):
+                session_state[session_key] = float(value)
+            elif isinstance(default, int):
+                session_state[session_key] = int(float(value))
+            elif isinstance(default, str):
+                session_state[session_key] = str(value)
+        except (TypeError, ValueError):
+            session_state[session_key] = default
+
+
+def apply_chatbot_env_to_session(session_state: Any, parsed: dict[str, str] | None = None) -> None:
+    """Apply non-credential `.env` chatbot settings to Streamlit session state."""
+    values = session_values_from_env(parsed)
+    for session_key, value in values.items():
+        if session_key in CREDENTIAL_ENV_VARS:
+            continue
+        session_state[session_key] = value
+    coerce_chatbot_session_types(session_state)
+
+
 def read_credential_for_env(session_state: Any, session_key: str) -> str:
     """Prefer the current widget value, then fall back to persisted memory."""
     widget_value = str(session_state.get(session_key, "") or "").strip()

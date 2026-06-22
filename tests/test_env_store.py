@@ -5,6 +5,9 @@ import pytest
 
 from eu_taxonomy_rag.llm.env_store import (
     apply_env_file_to_os,
+    apply_session_defaults,
+    apply_chatbot_env_to_session,
+    coerce_chatbot_session_types,
     env_updates_from_session,
     parse_env_file,
     persisted_credential_key,
@@ -116,3 +119,43 @@ def test_reload_env_into_memory(tmp_path: Path, monkeypatch: pytest.MonkeyPatch)
     assert values["chat_top_k"] == 8
     assert os.environ["OPENAI_API_KEY"] == "sk-reload"
     assert os.environ["EU_TAXONOMY_CHAT_TOP_K"] == "8"
+
+
+def test_apply_session_defaults_fills_missing_keys() -> None:
+    state: dict[str, object] = {}
+    apply_session_defaults(state)
+
+    assert state["llm_model"] == "gpt-4o-mini"
+    assert state["chat_top_k"] == 5
+    assert state["llm_temperature"] == 0.2
+
+
+def test_coerce_chatbot_session_types_repairs_invalid_values() -> None:
+    state = {
+        "llm_temperature": "0.35",
+        "llm_max_tokens": "512",
+        "chat_top_k": "7",
+        "chat_candidate_k": "15",
+        "chat_retrieval_method": "bm25",
+        "llm_model": "gpt-4o",
+    }
+    coerce_chatbot_session_types(state)
+
+    assert state["llm_temperature"] == pytest.approx(0.35)
+    assert state["llm_max_tokens"] == 512
+    assert state["chat_top_k"] == 7
+
+
+def test_apply_chatbot_env_to_session(tmp_path: Path) -> None:
+    env_file = tmp_path / ".env"
+    env_file.write_text(
+        "EU_TAXONOMY_LLM_MODEL=gpt-4o\n"
+        "EU_TAXONOMY_CHAT_TOP_K=9\n",
+        encoding="utf-8",
+    )
+
+    state: dict[str, object] = {"chat_top_k": 5, "llm_model": "gpt-4o-mini"}
+    apply_chatbot_env_to_session(state, parse_env_file(env_file))
+
+    assert state["llm_model"] == "gpt-4o"
+    assert state["chat_top_k"] == 9

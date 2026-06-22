@@ -7,12 +7,18 @@ import pytest
 from eu_taxonomy_rag.core.models import Chunk
 from eu_taxonomy_rag.evaluation.runner import (
     EvaluationRunResult,
+    build_indexes_for_methods,
     format_metrics_summary,
     load_eval_dataset,
     run_method_evaluation,
     run_retrieval_evaluation,
 )
-from eu_taxonomy_rag.pipelines.index_manager import build_all_indexes, clear_index_cache
+from eu_taxonomy_rag.pipelines.index_manager import (
+    build_all_indexes,
+    clear_index_cache,
+    index_artifacts_for_methods,
+    indexes_ready_for_methods,
+)
 from eu_taxonomy_rag.retrieval.retrieval_methods import RetrievalMethod
 
 
@@ -200,6 +206,36 @@ def test_run_retrieval_evaluation_natural_metadata_breakdown(
     report = run_result.methods["bm25"]
     assert "CFO" in report.by_persona
     assert "natural_simple" in report.by_query_type
+
+
+def test_indexes_ready_for_methods(tmp_path: Path) -> None:
+    methods = [RetrievalMethod.BM25, RetrievalMethod.HYBRID_MINILM]
+    artifacts = index_artifacts_for_methods(methods, tmp_path)
+
+    assert len(artifacts) == 2
+    assert not indexes_ready_for_methods(methods, tmp_path)
+
+
+def test_build_indexes_for_methods_reports_progress(
+    tmp_path: Path,
+    sample_chunks: list[Chunk],
+    mock_embeddings: None,
+) -> None:
+    progress_calls: list[tuple[str, int, int]] = []
+
+    build_indexes_for_methods(
+        sample_chunks,
+        [RetrievalMethod.BM25, RetrievalMethod.DENSE_MINILM],
+        base_dir=tmp_path,
+        force_rebuild=True,
+        progress_callback=lambda label, step, total: progress_calls.append((label, step, total)),
+    )
+
+    assert progress_calls == [("dense (minilm)", 1, 2), ("BM25", 2, 2)]
+    assert indexes_ready_for_methods(
+        [RetrievalMethod.BM25, RetrievalMethod.DENSE_MINILM],
+        tmp_path,
+    )
 
 
 def test_format_metrics_summary() -> None:

@@ -4,6 +4,14 @@ from __future__ import annotations
 
 import streamlit as st
 
+from generation_eval_ui import (
+    render_generation_evaluation,
+    render_history_tab,
+    render_metrics_tab,
+    run_and_store_generation_evaluation,
+)
+from eu_taxonomy_rag.evaluation.generation_eval import is_generation_eval_enabled
+
 from eu_taxonomy_rag.llm.config import (
     LLMConfig,
     LLMCredentials,
@@ -17,6 +25,8 @@ from eu_taxonomy_rag.llm.client import create_chat_client
 from eu_taxonomy_rag.llm.env_store import (
     CREDENTIAL_ENV_VARS,
     SESSION_DEFAULTS,
+    apply_chatbot_env_to_session,
+    apply_session_defaults,
     env_updates_from_session,
     read_persisted_credential,
     reload_env_into_memory,
@@ -25,11 +35,9 @@ from eu_taxonomy_rag.llm.env_store import (
     sync_persisted_credentials_from_env,
     write_env_file,
 )
-from eu_taxonomy_rag.pipelines.index_manager import DEFAULT_INDEX_DIR
 from eu_taxonomy_rag.pipelines.rag_pipeline import generate_rag_answer
 from eu_taxonomy_rag.retrieval.retrieval_methods import RetrievalMethod, available_retrieval_methods
 
-INDEX_DIR = DEFAULT_INDEX_DIR
 _SETTINGS_LOADED_KEY = "chatbot_settings_loaded"
 _WIDGETS_SEEDED_KEY = "chatbot_widgets_seeded"
 
@@ -56,29 +64,32 @@ def _sync_provider_selection() -> None:
         st.session_state["chat_llm_provider"] = ""
 
 
-def _seed_widget_state_before_render(*, force: bool = False) -> None:
+def _ensure_valid_retrieval_method(available_methods: list[RetrievalMethod]) -> None:
+    method_values = [method.value for method in available_methods]
+    current = st.session_state.get("chat_retrieval_method")
+    if method_values and current not in method_values:
+        st.session_state["chat_retrieval_method"] = method_values[0]
+
+
+def _seed_widget_state_before_render(
+    *,
+    force: bool = False,
+    available_methods: list[RetrievalMethod] | None = None,
+) -> None:
     """Apply `.env` values to widget keys once, or again after an explicit reload."""
     sync_persisted_credentials_from_env(st.session_state)
+    apply_session_defaults(st.session_state)
+
+    methods = available_methods or list(available_retrieval_methods())
+    _ensure_valid_retrieval_method(methods)
 
     if not force and st.session_state.get(_WIDGETS_SEEDED_KEY):
         _sync_provider_selection()
         return
 
-    values = session_values_from_env()
-
-    for key, default in SESSION_DEFAULTS.items():
-        st.session_state.setdefault(key, default)
-
-    for key, value in values.items():
-        if key in _SECRET_WIDGET_KEYS:
-            continue
-        st.session_state[key] = value
-
+    apply_chatbot_env_to_session(st.session_state)
+    _ensure_valid_retrieval_method(methods)
     _sync_provider_selection()
-
-    method_values = [method.value for method in available_retrieval_methods()]
-    if st.session_state.get("chat_retrieval_method") not in method_values:
-        st.session_state["chat_retrieval_method"] = SESSION_DEFAULTS["chat_retrieval_method"]
 
     st.session_state[_WIDGETS_SEEDED_KEY] = True
 
@@ -89,16 +100,15 @@ def reload_chatbot_settings_from_env() -> None:
     sync_persisted_credentials_from_env(st.session_state)
     for widget_key in _SECRET_WIDGET_KEYS.values():
         st.session_state.pop(widget_key, None)
+    st.session_state.pop(_WIDGETS_SEEDED_KEY, None)
     _seed_widget_state_before_render(force=True)
     st.rerun()
 
 
 def ensure_chatbot_settings_loaded() -> None:
-    """Load persisted credentials from `.env` into internal session memory."""
+    """Load persisted credentials and chatbot defaults from `.env` into session memory."""
     sync_persisted_credentials_from_env(st.session_state)
-
-    for key, default in SESSION_DEFAULTS.items():
-        st.session_state.setdefault(key, default)
+    apply_session_defaults(st.session_state)
 
     if not st.session_state.get(_SETTINGS_LOADED_KEY):
         values = session_values_from_env()
@@ -106,6 +116,7 @@ def ensure_chatbot_settings_loaded() -> None:
             st.session_state,
             {key: value for key, value in values.items() if key in CREDENTIAL_ENV_VARS},
         )
+        apply_chatbot_env_to_session(st.session_state)
         st.session_state[_SETTINGS_LOADED_KEY] = True
 
 
@@ -282,6 +293,9 @@ def render_connection_tab() -> None:
 def render_parameters_tab(available_methods: list[RetrievalMethod]) -> None:
     st.subheader("Model & retrieval parameters")
 
+    apply_session_defaults(st.session_state)
+    _ensure_valid_retrieval_method(available_methods)
+
     credentials = _credentials_from_session()
     active = _render_provider_dropdown(credentials)
 
@@ -323,18 +337,33 @@ def render_parameters_tab(available_methods: list[RetrievalMethod]) -> None:
 def render_chatbot_page(
     *,
     get_chunks,
-    warm_indexes,
+    indexes_ready_for_methods,
+    index_dir,
     method_label,
     filter_selected_methods,
 ) -> None:
     _init_session_state()
-    _seed_widget_state_before_render()
+    available_methods = available_retrieval_methods()
+    _seed_widget_state_before_render(available_methods=list(available_methods))
 
     st.header("EU Taxonomy RAG Chatbot")
     st.caption("Single-turn Q&A — each question is answered from retrieved FAQ context only (no chat memory).")
 
-    available_methods = available_retrieval_methods()
-    tab_chat, tab_params, tab_conn = st.tabs(["Chat", "Parameters", "LLM connection"])
+    tab_chat, tab_history, tab_metrics, tab_params, tab_conn = st.tabs(
+        ["Chat", "History", "Metrics", "Parameters", "LLM connection"]
+    )
+
+    with tab_history:
+        if is_generation_eval_enabled():
+            render_history_tab()
+        else:
+            st.info("Generation evaluation is disabled. Set `ENABLE_GENERATION_EVAL=true` to enable it.")
+
+    with tab_metrics:
+        if is_generation_eval_enabled():
+            render_metrics_tab()
+        else:
+            st.info("Generation evaluation is disabled. Set `ENABLE_GENERATION_EVAL=true` to enable it.")
 
     with tab_conn:
         render_connection_tab()
@@ -378,7 +407,13 @@ def render_chatbot_page(
             if not methods:
                 return
 
-            warm_indexes((method_value,))
+            if not indexes_ready_for_methods(methods, index_dir):
+                st.error(
+                    "Required indexes are missing. Build them from the **Benchmark** page "
+                    "before asking questions."
+                )
+                return
+
             chunks = get_chunks()
 
             with st.spinner(
@@ -393,7 +428,7 @@ def render_chatbot_page(
                         method=methods[0],
                         k=int(st.session_state["chat_top_k"]),
                         candidate_k=int(st.session_state["chat_candidate_k"]),
-                        base_dir=INDEX_DIR,
+                        base_dir=index_dir,
                         build_indexes=False,
                     )
                 except Exception as exc:
@@ -417,3 +452,14 @@ def render_chatbot_page(
                         f"**#{item.rank}** `{item.chunk.chunk_id}` — score `{item.score:.4f}`  \n"
                         f"*{item.chunk.question[:150]}{'…' if len(item.chunk.question) > 150 else ''}*"
                     )
+
+            if is_generation_eval_enabled():
+                with st.spinner("Evaluating answer groundedness…"):
+                    evaluation = run_and_store_generation_evaluation(
+                        result,
+                        retrieval_method=method_value,
+                        top_k=int(st.session_state["chat_top_k"]),
+                        candidate_k=int(st.session_state["chat_candidate_k"]),
+                    )
+                if evaluation is not None:
+                    render_generation_evaluation(evaluation)

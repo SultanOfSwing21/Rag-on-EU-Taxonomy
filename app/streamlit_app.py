@@ -12,11 +12,12 @@ import streamlit as st
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from chatbot_page import ensure_chatbot_settings_loaded, render_chatbot_page
 
-from eu_taxonomy_rag.cache.chunk_cache import load_or_build_chunks
+from eu_taxonomy_rag.evaluation.generation_eval import is_generation_eval_enabled
+
+from eu_taxonomy_rag.paths import DEFAULT_EVAL_DB, DEFAULT_INDEX_DIR, PROJECT_ROOT
 from eu_taxonomy_rag.evaluation.dashboard import (
     AVAILABLE_DATASETS,
     METRIC_COLUMNS,
-    PROJECT_ROOT,
     RESULTS_DIR,
     build_segment_comparison_df,
     build_segment_filtered_comparison_df,
@@ -35,8 +36,11 @@ from eu_taxonomy_rag.evaluation.runner import (
     default_output_path,
     run_retrieval_evaluation,
 )
-from eu_taxonomy_rag.pipelines.index_manager import DEFAULT_INDEX_DIR
-from eu_taxonomy_rag.retrieval.embeddings import is_sentence_transformers_available
+from eu_taxonomy_rag.pipelines.index_manager import (
+    IndexArtifact,
+    index_artifacts_for_methods,
+    indexes_ready_for_methods,
+)
 from eu_taxonomy_rag.retrieval.retrieval_methods import RetrievalMethod, available_retrieval_methods
 from eu_taxonomy_rag.retrieval.retriever import Retriever
 
@@ -49,7 +53,7 @@ st.set_page_config(
 AVAILABLE_METHODS = available_retrieval_methods()
 METHOD_OPTIONS = [(method.value, method_label(method.value)) for method in AVAILABLE_METHODS]
 DEFAULT_METHOD_VALUES = [method.value for method in AVAILABLE_METHODS]
-INDEX_DIR = PROJECT_ROOT / DEFAULT_INDEX_DIR
+INDEX_DIR = DEFAULT_INDEX_DIR
 
 
 def render_environment_notice() -> None:
@@ -59,7 +63,7 @@ def render_environment_notice() -> None:
 
     st.sidebar.caption(f"Dense backend: **{dense_index_backend()}**")
 
-    if is_sentence_transformers_available():
+    if is_sentence_transformers_availablegiy ():
         from eu_taxonomy_rag.retrieval.embeddings import embedding_device
 
         st.sidebar.caption(f"Embedding device: **{embedding_device()}**")
@@ -89,18 +93,56 @@ def filter_selected_methods(method_values: list[str]) -> list[RetrievalMethod]:
     return selected
 
 
+@st.cache_resource(show_spinner="Preparing FAQ chunks…")
+def bootstrap_application():
+    """Build chunks and evaluation storage once per session (indexes are built manually)."""
+    from eu_taxonomy_rag.pipelines.ingestion import run_ingestion
+    from eu_taxonomy_rag.storage.evaluation_store import init_evaluation_db
+
+    init_evaluation_db(DEFAULT_EVAL_DB)
+    return run_ingestion(build_indexes=False)
+
+
 @st.cache_resource(show_spinner="Loading FAQ chunks…")
 def get_chunks():
-    return load_or_build_chunks()
+    result = bootstrap_application()
+    return list(result.chunks)
 
 
-@st.cache_resource(show_spinner="Warming retrieval indexes…")
-def warm_indexes(method_values: tuple[str, ...]) -> str:
-    """Build/load indexes once per Streamlit session."""
-    chunks = load_or_build_chunks()
-    methods = [RetrievalMethod(value) for value in method_values]
-    build_indexes_for_methods(chunks, methods, base_dir=INDEX_DIR)
-    return "ready"
+def _format_index_status(artifacts: list[IndexArtifact]) -> str:
+    if not artifacts:
+        return "Select at least one retrieval method."
+    return "\n".join(
+        f"{'✅' if artifact.exists else '⏳'} {artifact.label}"
+        for artifact in artifacts
+    )
+
+
+def _build_indexes_with_progress(
+    methods: list[RetrievalMethod],
+    chunks: list,
+    *,
+    force_rebuild: bool = False,
+) -> None:
+    progress = st.progress(0.0, text="Starting index build…")
+    status = st.empty()
+
+    def on_index_progress(label: str, step: int, total: int) -> None:
+        progress.progress(
+            step / total,
+            text=f"Building {label} ({step}/{total})",
+        )
+        status.info(f"Building **{label}** — this may take a few minutes on first run.")
+
+    build_indexes_for_methods(
+        chunks,
+        methods,
+        base_dir=INDEX_DIR,
+        force_rebuild=force_rebuild,
+        progress_callback=on_index_progress,
+    )
+    progress.progress(1.0, text="Indexes ready.")
+    status.success("All required indexes are ready.")
 
 
 def _render_metric_heatmap(df: pd.DataFrame, metric_key: str, metric_label: str) -> None:
@@ -209,6 +251,23 @@ def page_benchmark() -> None:
         limit_value = None if limit == 0 else int(limit)
 
     with col_run:
+        methods_for_status = filter_selected_methods(method_values) if method_values else []
+        index_artifacts = index_artifacts_for_methods(methods_for_status, INDEX_DIR)
+
+        st.subheader("Indexes")
+        st.caption(
+            "Build retrieval indexes here before running a benchmark. "
+            "The first build downloads embedding models and can take several minutes."
+        )
+        st.markdown(_format_index_status(index_artifacts))
+        force_rebuild_indexes = st.checkbox("Force rebuild indexes", value=False)
+        build_indexes_button = st.button(
+            "Build indexes",
+            use_container_width=True,
+            disabled=not methods_for_status,
+        )
+
+        st.divider()
         st.subheader("Run")
         run_button = st.button("Run benchmark", type="primary", use_container_width=True)
         save_results = st.checkbox("Save JSON results", value=True)
@@ -217,6 +276,16 @@ def page_benchmark() -> None:
             "Missing datasets are loaded from the latest saved JSON on disk. "
             "**Run benchmark** forces a fresh evaluation."
         )
+
+    if build_indexes_button:
+        if not methods_for_status:
+            st.warning("Select at least one retrieval method.")
+        else:
+            _build_indexes_with_progress(
+                methods_for_status,
+                get_chunks(),
+                force_rebuild=force_rebuild_indexes,
+            )
 
     selected_specs = [spec for spec in available if spec.key in dataset_keys]
     _ensure_benchmark_results_loaded(selected_specs)
@@ -275,9 +344,15 @@ def page_benchmark() -> None:
         if not methods:
             return
 
+        if not indexes_ready_for_methods(methods, INDEX_DIR):
+            st.error(
+                "Required indexes are missing. Build them with **Build indexes** "
+                "in the panel on the right before running the benchmark."
+            )
+            return
+
         status = st.empty()
-        progress = st.progress(0.0, text="Warming indexes…")
-        warm_indexes(tuple(sorted(method_values)))
+        progress = st.progress(0.0, text="Starting evaluation…")
         chunks = get_chunks()
 
         results: dict = {}
@@ -289,7 +364,7 @@ def page_benchmark() -> None:
             completed_steps += 1
             progress.progress(
                 completed_steps / total_steps,
-                text=f"{dataset_name} · {method_label(method.value)} ({completed_steps}/{total_steps})",
+                text=f"Evaluating {dataset_name} · {method_label(method.value)} ({completed_steps}/{total_steps})",
             )
 
         for spec in selected_specs:
@@ -532,7 +607,14 @@ def page_interactive() -> None:
         methods = filter_selected_methods(method_values)
         if not methods:
             return
-        warm_indexes(tuple(sorted(method_values)))
+
+        if not indexes_ready_for_methods(methods, INDEX_DIR):
+            st.error(
+                "Required indexes are missing. Build them from the **Benchmark** page "
+                "before using interactive search."
+            )
+            return
+
         expected = set(selected_option.expected_chunk_ids) if selected_option else set()
 
         columns = st.columns(len(methods))
@@ -721,10 +803,17 @@ def main() -> None:
 
     st.title("EU Taxonomy RAG")
     st.markdown(
-        "Retrieval evaluation, data exploration, and **RAG chatbot** for EU Taxonomy FAQs."
+        "### Retrieval evaluation, data exploration, and **RAG chatbot** for EU Taxonomy FAQs."
     )
-
+    st.divider()
     render_environment_notice()
+
+    if is_generation_eval_enabled():
+        st.sidebar.caption("Generation eval: **enabled**")
+    else:
+        st.sidebar.caption("Generation eval: **disabled**")
+
+    st.sidebar.divider()
 
     page = st.sidebar.radio(
         "Navigation",
@@ -739,7 +828,8 @@ def main() -> None:
     if page == "Chatbot":
         render_chatbot_page(
             get_chunks=get_chunks,
-            warm_indexes=warm_indexes,
+            indexes_ready_for_methods=indexes_ready_for_methods,
+            index_dir=INDEX_DIR,
             method_label=method_label,
             filter_selected_methods=filter_selected_methods,
         )
