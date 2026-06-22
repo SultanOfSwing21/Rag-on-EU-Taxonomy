@@ -216,3 +216,9 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Instructions locales (objectifs, notes de dev)
+Instructions/
+
+# Cache local (chunks, index, etc.)
+.cache/
