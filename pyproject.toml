@@ -1,0 +1,38 @@
+[project]
+name = "eu-taxonomy-rag"
+version = "0.1.0"
+description = "Chatbot RAG sur les FAQ de l'EU Taxonomy"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "sentence-transformers==2.7.0",
+    "transformers==4.40.2",
+    "torch==2.2.2",
+    "numpy==1.26.4",
+    "openai>=1.0.0",
+    "bm25s>=0.2.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+]
+faiss = [
+    "faiss-cpu>=1.8.0",
+]
+ui = [
+    "streamlit>=1.32.0",
+    "pandas>=2.0.0",
+    "matplotlib>=3.8.0",
+]
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

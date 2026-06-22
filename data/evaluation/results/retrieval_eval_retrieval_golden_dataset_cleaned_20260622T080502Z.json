@@ -1,0 +1,145 @@
+{
+  "dataset_path": "/Users/Papa/Desktop/RAG - Sopra Steria/RAG - Implementation/data/evaluation/retrieval_golden_dataset_cleaned.jsonl",
+  "num_queries": 700,
+  "retrieval_k": 5,
+  "candidate_k": 20,
+  "index_dir": "/Users/Papa/Desktop/RAG - Sopra Steria/RAG - Implementation/.cache/index",
+  "generated_at": "2026-06-22T08:04:44+00:00",
+  "methods": {
+    "dense_minilm": {
+      "overall": {
+        "recall@1": 0.6369047619047619,
+        "recall@3": 0.7214285714285714,
+        "recall@5": 0.758095238095238,
+        "mrr": 0.7191428571428568,
+        "num_queries": 700
+      },
+      "by_difficulty": {
+        "complex": {
+          "recall@1": 0.09916666666666667,
+          "recall@3": 0.17,
+          "recall@5": 0.24333333333333332,
+          "mrr": 0.2711666666666667,
+          "num_queries": 200
+        },
+        "simple": {
+          "recall@1": 0.852,
+          "recall@3": 0.942,
+          "recall@5": 0.964,
+          "mrr": 0.8983333333333332,
+          "num_queries": 500
+        }
+      },
+      "by_persona": {},
+      "by_query_type": {}
+    },
+    "dense_mpnet": {
+      "overall": {
+        "recall@1": 0.6828571428571428,
+        "recall@3": 0.7571428571428571,
+        "recall@5": 0.7811904761904762,
+        "mrr": 0.7601190476190475,
+        "num_queries": 700
+      },
+      "by_difficulty": {
+        "complex": {
+          "recall@1": 0.1,
+          "recall@3": 0.205,
+          "recall@5": 0.26916666666666667,
+          "mrr": 0.29400000000000004,
+          "num_queries": 200
+        },
+        "simple": {
+          "recall@1": 0.916,
+          "recall@3": 0.978,
+          "recall@5": 0.986,
+          "mrr": 0.9465666666666666,
+          "num_queries": 500
+        }
+      },
+      "by_persona": {},
+      "by_query_type": {}
+    },
+    "bm25": {
+      "overall": {
+        "recall@1": 0.6964285714285713,
+        "recall@3": 0.8002380952380953,
+        "recall@5": 0.8266666666666667,
+        "mrr": 0.8172142857142858,
+        "num_queries": 700
+      },
+      "by_difficulty": {
+        "complex": {
+          "recall@1": 0.22250000000000003,
+          "recall@3": 0.39083333333333337,
+          "recall@5": 0.44833333333333336,
+          "mrr": 0.5461666666666666,
+          "num_queries": 200
+        },
+        "simple": {
+          "recall@1": 0.886,
+          "recall@3": 0.964,
+          "recall@5": 0.978,
+          "mrr": 0.9256333333333332,
+          "num_queries": 500
+        }
+      },
+      "by_persona": {},
+      "by_query_type": {}
+    },
+    "hybrid_minilm": {
+      "overall": {
+        "recall@1": 0.677142857142857,
+        "recall@3": 0.778809523809524,
+        "recall@5": 0.8004761904761906,
+        "mrr": 0.7821666666666665,
+        "num_queries": 700
+      },
+      "by_difficulty": {
+        "complex": {
+          "recall@1": 0.165,
+          "recall@3": 0.30583333333333335,
+          "recall@5": 0.3616666666666667,
+          "mrr": 0.42391666666666666,
+          "num_queries": 200
+        },
+        "simple": {
+          "recall@1": 0.882,
+          "recall@3": 0.968,
+          "recall@5": 0.976,
+          "mrr": 0.9254666666666665,
+          "num_queries": 500
+        }
+      },
+      "by_persona": {},
+      "by_query_type": {}
+    },
+    "hybrid_mpnet": {
+      "overall": {
+        "recall@1": 0.7116666666666666,
+        "recall@3": 0.7859523809523808,
+        "recall@5": 0.8066666666666666,
+        "mrr": 0.8044523809523813,
+        "num_queries": 700
+      },
+      "by_difficulty": {
+        "complex": {
+          "recall@1": 0.17083333333333336,
+          "recall@3": 0.30583333333333335,
+          "recall@5": 0.3633333333333333,
+          "mrr": 0.431,
+          "num_queries": 200
+        },
+        "simple": {
+          "recall@1": 0.928,
+          "recall@3": 0.978,
+          "recall@5": 0.984,
+          "mrr": 0.9538333333333334,
+          "num_queries": 500
+        }
+      },
+      "by_persona": {},
+      "by_query_type": {}
+    }
+  }
+}
