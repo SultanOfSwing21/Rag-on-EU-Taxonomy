@@ -64,7 +64,7 @@ def render_environment_notice() -> None:
 
     st.sidebar.caption(f"Dense backend: **{dense_index_backend()}**")
 
-    if is_sentence_transformers_availablegiy ():
+    if is_sentence_transformers_available():
         from eu_taxonomy_rag.retrieval.embeddings import embedding_device
 
         st.sidebar.caption(f"Embedding device: **{embedding_device()}**")
@@ -208,96 +208,28 @@ def _filter_benchmark_view(
     )
 
 
-def page_benchmark() -> None:
-    st.header("Multi-dataset benchmark")
-    st.caption(
-        "Compare Recall@K and MRR across evaluation datasets and retrieval methods "
-        "(BM25, dense MiniLM/MPNet, hybrid RRF)."
-    )
-
-    available = [spec for spec in AVAILABLE_DATASETS if spec.exists]
-    if not available:
-        st.error("No evaluation datasets found in data/evaluation/.")
+def _render_benchmark_results(
+    *,
+    dataset_keys: list[str],
+    method_values: list[str],
+) -> None:
+    if not dataset_keys or not method_values:
         return
-
-    col_cfg, col_run = st.columns([2, 1])
-
-    with col_cfg:
-        dataset_keys = st.multiselect(
-            "Datasets",
-            options=[spec.key for spec in available],
-            default=[spec.key for spec in available],
-            format_func=lambda key: next(spec.label for spec in available if spec.key == key),
-        )
-        for spec in available:
-            if spec.key in dataset_keys:
-                st.caption(f"**{spec.label}** — {spec.description}")
-
-        method_values = st.multiselect(
-            "Retrieval methods",
-            options=[value for value, _ in METHOD_OPTIONS],
-            default=DEFAULT_METHOD_VALUES,
-            format_func=method_label,
-        )
-
-        c1, c2, c3 = st.columns(3)
-        with c1:
-            k = st.number_input("Top-k retrieval", min_value=1, max_value=20, value=5)
-        with c2:
-            candidate_k = st.number_input("Candidate-k (hybrid)", min_value=5, max_value=50, value=20)
-        with c3:
-            limit = st.number_input("Question limit (0 = all)", min_value=0, value=0)
-        limit_value = None if limit == 0 else int(limit)
-
-    with col_run:
-        methods_for_status = filter_selected_methods(method_values) if method_values else []
-        index_artifacts = index_artifacts_for_methods(methods_for_status, INDEX_DIR)
-
-        st.subheader("Indexes")
-        st.caption(
-            "Build retrieval indexes here before running a benchmark. "
-            "The first build downloads embedding models and can take several minutes."
-        )
-        st.markdown(_format_index_status(index_artifacts))
-        force_rebuild_indexes = st.checkbox("Force rebuild indexes", value=False)
-        build_indexes_button = st.button(
-            "Build indexes",
-            use_container_width=True,
-            disabled=not methods_for_status,
-        )
-
-        st.divider()
-        st.subheader("Run")
-        run_button = st.button("Run benchmark", type="primary", use_container_width=True)
-        save_results = st.checkbox("Save JSON results", value=True)
-        st.caption(
-            "Results update when you change dataset, method, or segment filters. "
-            "Missing datasets are loaded from the latest saved JSON on disk. "
-            "**Run benchmark** forces a fresh evaluation."
-        )
-
-    if build_indexes_button:
-        if not methods_for_status:
-            st.warning("Select at least one retrieval method.")
-        else:
-            _build_indexes_with_progress(
-                methods_for_status,
-                get_chunks(),
-                force_rebuild=force_rebuild_indexes,
-            )
-
-    selected_specs = [spec for spec in available if spec.key in dataset_keys]
-    _ensure_benchmark_results_loaded(selected_specs)
 
     preview_results = filter_benchmark_results(
         st.session_state.get("benchmark_results") or {},
         dataset_keys=dataset_keys,
         method_values=method_values,
     )
+    if not preview_results:
+        return
+
     available_difficulties = collect_segment_values(preview_results, "difficulty")
     available_personas = collect_segment_values(preview_results, "persona")
 
-    with col_cfg:
+    difficulty_filter: list[str] = []
+    persona_filter: list[str] = []
+    if available_difficulties or available_personas:
         c4, c5 = st.columns(2)
         with c4:
             difficulty_filter = st.multiselect(
@@ -316,12 +248,12 @@ def page_benchmark() -> None:
                 disabled=not available_personas,
             )
 
-    if difficulty_filter and persona_filter:
-        st.warning(
-            "Difficulty and persona filters cannot be combined. "
-            "The persona filter is applied; clear it to filter by difficulty."
-        )
-        difficulty_filter = []
+        if difficulty_filter and persona_filter:
+            st.warning(
+                "Difficulty and persona filters cannot be combined. "
+                "The persona filter is applied; clear it to filter by difficulty."
+            )
+            difficulty_filter = []
 
     if st.session_state.get("benchmark_from_disk") and st.session_state.get("benchmark_sources"):
         sources = st.session_state["benchmark_sources"]
@@ -331,7 +263,161 @@ def page_benchmark() -> None:
             if key in dataset_keys
         ]
         if lines:
-            st.info("In-memory results (latest saved JSON per dataset):\n" + "\n".join(lines))
+            st.info("Loaded from disk:\n" + "\n".join(lines))
+
+    results, df = _filter_benchmark_view(
+        dataset_keys,
+        method_values,
+        difficulties=difficulty_filter or None,
+        personas=persona_filter or None,
+    )
+
+    if df is None or df.empty:
+        if difficulty_filter or persona_filter:
+            st.info("No results for the selected difficulty/persona filters.")
+        return
+
+    st.subheader("Results")
+    if difficulty_filter:
+        st.caption(f"Metrics filtered by difficulty: **{', '.join(difficulty_filter)}**")
+    elif persona_filter:
+        st.caption(f"Metrics filtered by persona: **{', '.join(persona_filter)}**")
+
+    overview_columns = ["dataset", "method_label", "recall@1", "recall@3", "recall@5", "mrr", "num_queries"]
+    overview_labels = ["Dataset", "Method", "Recall@1", "Recall@3", "Recall@5", "MRR", "Questions"]
+    if "segment_label" in df.columns:
+        overview_columns.insert(1, "segment_label")
+        overview_labels.insert(1, "Segment")
+
+    display_df = df[overview_columns].copy()
+    display_df.columns = overview_labels
+    st.dataframe(
+        display_df.style.format(
+            {"Recall@1": "{:.3f}", "Recall@3": "{:.3f}", "Recall@5": "{:.3f}", "MRR": "{:.3f}"}
+        ),
+        use_container_width=True,
+        hide_index=True,
+    )
+
+    tab_heat, tab_bars, tab_segments = st.tabs(["Heatmaps", "Bar charts", "Breakdowns"])
+
+    with tab_heat:
+        for metric_key, metric_label in METRIC_COLUMNS:
+            st.markdown(f"**{metric_label}** — method × dataset")
+            _render_metric_heatmap(df, metric_key, metric_label)
+
+    with tab_bars:
+        for metric_key, metric_label in METRIC_COLUMNS:
+            _render_grouped_bars(df, metric_key, metric_label)
+
+    with tab_segments:
+        segment = st.selectbox(
+            "Break down by",
+            options=["difficulty", "persona", "query_type"],
+            format_func=lambda value: {
+                "difficulty": "Difficulty (simple / complex)",
+                "persona": "Persona (natural datasets)",
+                "query_type": "Query type",
+            }[value],
+        )
+        segment_df = build_segment_comparison_df(results, segment)
+        if segment_df.empty:
+            st.info("No metadata available for this breakdown on the selected datasets.")
+        else:
+            selected_dataset = st.selectbox(
+                "Dataset",
+                options=sorted(segment_df["dataset"].unique()),
+            )
+            filtered = segment_df[segment_df["dataset"] == selected_dataset]
+            for metric_key, metric_label in METRIC_COLUMNS:
+                st.markdown(f"**{metric_label}** — {selected_dataset}")
+                pivot = filtered.pivot_table(
+                    index="method_label",
+                    columns="segment",
+                    values=metric_key,
+                    aggfunc="first",
+                )
+                if not pivot.empty:
+                    st.dataframe(
+                        pivot.style.format("{:.3f}").background_gradient(cmap="Greens", axis=None, vmin=0, vmax=1),
+                        use_container_width=True,
+                    )
+
+
+def page_benchmark() -> None:
+    st.header("Multi-dataset benchmark")
+    st.caption(
+        "Compare Recall@K and MRR across evaluation datasets and retrieval methods "
+        "(BM25, dense MiniLM/MPNet, hybrid RRF)."
+    )
+
+    available = [spec for spec in AVAILABLE_DATASETS if spec.exists]
+    if not available:
+        st.error("No evaluation datasets found in data/evaluation/.")
+        return
+
+    method_values = st.multiselect(
+        "Retrieval methods",
+        options=[value for value, _ in METHOD_OPTIONS],
+        default=DEFAULT_METHOD_VALUES,
+        format_func=method_label,
+    )
+    methods_for_status = filter_selected_methods(method_values) if method_values else []
+    indexes_ready = bool(methods_for_status) and indexes_ready_for_methods(methods_for_status, INDEX_DIR)
+
+    if not indexes_ready:
+        st.subheader("Indexes")
+        st.caption(
+            "Build the retrieval indexes required for your selected methods. "
+            "The first build downloads embedding models and can take several minutes."
+        )
+        if methods_for_status:
+            st.markdown(_format_index_status(index_artifacts_for_methods(methods_for_status, INDEX_DIR)))
+        else:
+            st.info("Select at least one retrieval method.")
+
+        force_rebuild_indexes = st.checkbox("Force rebuild indexes", value=False)
+        if st.button("Build indexes", type="primary", use_container_width=True, disabled=not methods_for_status):
+            _build_indexes_with_progress(
+                methods_for_status,
+                get_chunks(),
+                force_rebuild=force_rebuild_indexes,
+            )
+        return
+
+    dataset_keys = st.multiselect(
+        "Datasets",
+        options=[spec.key for spec in available],
+        default=[spec.key for spec in available],
+        format_func=lambda key: next(spec.label for spec in available if spec.key == key),
+    )
+    for spec in available:
+        if spec.key in dataset_keys:
+            st.caption(f"**{spec.label}** — {spec.description}")
+
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        k = st.number_input("Top-k retrieval", min_value=1, max_value=20, value=5)
+    with c2:
+        candidate_k = st.number_input("Candidate-k (hybrid)", min_value=5, max_value=50, value=20)
+    with c3:
+        limit = st.number_input("Question limit (0 = all)", min_value=0, value=0)
+    limit_value = None if limit == 0 else int(limit)
+
+    st.subheader("Run benchmark")
+    run_col, save_col = st.columns([1, 1])
+    with run_col:
+        run_button = st.button("Run benchmark", type="primary", use_container_width=True)
+    with save_col:
+        save_results = st.checkbox("Save JSON results", value=True)
+    st.caption(
+        "Results update when you change dataset, method, or segment filters. "
+        "Missing datasets are loaded from the latest saved JSON on disk. "
+        "**Run benchmark** forces a fresh evaluation."
+    )
+
+    selected_specs = [spec for spec in available if spec.key in dataset_keys]
+    _ensure_benchmark_results_loaded(selected_specs)
 
     if run_button:
         if not dataset_keys or not method_values:
@@ -344,10 +430,7 @@ def page_benchmark() -> None:
             return
 
         if not indexes_ready_for_methods(methods, INDEX_DIR):
-            st.error(
-                "Required indexes are missing. Build them with **Build indexes** "
-                "in the panel on the right before running the benchmark."
-            )
+            st.error("Required indexes are missing. Rebuild them from this page.")
             return
 
         status = st.empty()
@@ -399,101 +482,10 @@ def page_benchmark() -> None:
         st.session_state["benchmark_from_disk"] = False
         st.success(f"Benchmark completed on {len(selected_specs)} dataset(s).")
 
-    if not dataset_keys or not method_values:
-        st.info("Select at least one dataset and one retrieval method.")
-        return
-
-    results, df = _filter_benchmark_view(
-        dataset_keys,
-        method_values,
-        difficulties=difficulty_filter or None,
-        personas=persona_filter or None,
+    _render_benchmark_results(
+        dataset_keys=dataset_keys,
+        method_values=method_values,
     )
-
-    if df is None or df.empty:
-        cached = st.session_state.get("benchmark_results") or {}
-        missing_datasets = [key for key in dataset_keys if key not in cached]
-        if missing_datasets:
-            st.info(
-                "No saved results yet for: "
-                + ", ".join(get_dataset_spec(key).label for key in missing_datasets)
-                + ". Run a benchmark or check `data/evaluation/results/`."
-            )
-        else:
-            if difficulty_filter or persona_filter:
-                st.info("No results for the selected difficulty/persona filters.")
-            else:
-                st.info("No results for the current dataset/method filters.")
-        return
-
-    st.subheader("Overview")
-    if difficulty_filter:
-        st.caption(f"Metrics filtered by difficulty: **{', '.join(difficulty_filter)}**")
-    elif persona_filter:
-        st.caption(f"Metrics filtered by persona: **{', '.join(persona_filter)}**")
-
-    overview_columns = ["dataset", "method_label", "recall@1", "recall@3", "recall@5", "mrr", "num_queries"]
-    overview_labels = ["Dataset", "Method", "Recall@1", "Recall@3", "Recall@5", "MRR", "Questions"]
-    if "segment_label" in df.columns:
-        overview_columns.insert(1, "segment_label")
-        overview_labels.insert(1, "Segment")
-
-    display_df = df[overview_columns].copy()
-    display_df.columns = overview_labels
-    st.dataframe(
-        display_df.style.format(
-            {"Recall@1": "{:.3f}", "Recall@3": "{:.3f}", "Recall@5": "{:.3f}", "MRR": "{:.3f}"}
-        ),
-        use_container_width=True,
-        hide_index=True,
-    )
-
-    tab_heat, tab_bars, tab_segments = st.tabs(["Heatmaps", "Bar charts", "Breakdowns"])
-
-    with tab_heat:
-        for metric_key, metric_label in METRIC_COLUMNS:
-            st.markdown(f"**{metric_label}** — method × dataset")
-            _render_metric_heatmap(df, metric_key, metric_label)
-
-    with tab_bars:
-        for metric_key, metric_label in METRIC_COLUMNS:
-            _render_grouped_bars(df, metric_key, metric_label)
-
-    with tab_segments:
-        if results is None:
-            return
-
-        segment = st.selectbox(
-            "Break down by",
-            options=["difficulty", "persona", "query_type"],
-            format_func=lambda value: {
-                "difficulty": "Difficulty (simple / complex)",
-                "persona": "Persona (natural datasets)",
-                "query_type": "Query type",
-            }[value],
-        )
-        segment_df = build_segment_comparison_df(results, segment)
-        if segment_df.empty:
-            st.info("No metadata available for this breakdown on the selected datasets.")
-        else:
-            selected_dataset = st.selectbox(
-                "Dataset",
-                options=sorted(segment_df["dataset"].unique()),
-            )
-            filtered = segment_df[segment_df["dataset"] == selected_dataset]
-            for metric_key, metric_label in METRIC_COLUMNS:
-                st.markdown(f"**{metric_label}** — {selected_dataset}")
-                pivot = filtered.pivot_table(
-                    index="method_label",
-                    columns="segment",
-                    values=metric_key,
-                    aggfunc="first",
-                )
-                if not pivot.empty:
-                    st.dataframe(
-                        pivot.style.format("{:.3f}").background_gradient(cmap="Greens", axis=None, vmin=0, vmax=1),
-                        use_container_width=True,
-                    )
 
 
 def page_interactive() -> None:

@@ -1,0 +1,23 @@
+name: eu-taxonomy-rag
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: eu-taxonomy-rag
+    ports:
+      - "8501:8501"
+    environment:
+      EU_TAXONOMY_PROJECT_ROOT: /app
+      ENABLE_GENERATION_EVAL: "true"
+      EU_TAXONOMY_EMBEDDING_DEVICE: cpu
+    volumes:
+      - ./.cache:/app/.cache
+      - hf-cache:/root/.cache/huggingface
+    env_file:
+      - path: .env
+        required: false
+
+volumes:
+  hf-cache:

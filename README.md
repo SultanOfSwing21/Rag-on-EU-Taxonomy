@@ -86,7 +86,9 @@ docker compose up --build
 
 Ouvrez [http://localhost:8501](http://localhost:8501).
 
-Le cache (chunks, index de recherche, base d'évaluation) est persisté dans le volume Docker `rag-cache`, monté sur `/app/.cache`.
+Le cache (chunks, index de recherche, base d'évaluation) est persisté via un **bind mount** sur `./.cache` du dépôt. Les modèles Hugging Face sont mis en cache dans le volume Docker `eu-taxonomy-rag_hf-cache`.
+
+Le build Docker met en cache l'installation `pip` : elle n'est relancée que si `pyproject.toml` ou `README.md` change. Une modification du code (`src/`, `app/`, etc.) recompile uniquement les couches suivantes (quelques secondes).
 
 ### Avec Docker seul
 
@@ -94,7 +96,8 @@ Le cache (chunks, index de recherche, base d'évaluation) est persisté dans le 
 docker build -t eu-taxonomy-rag .
 docker run --rm -p 8501:8501 \
   -e EU_TAXONOMY_PROJECT_ROOT=/app \
-  -v eu-taxonomy-rag-cache:/app/.cache \
+  -v "$(pwd)/.cache:/app/.cache" \
+  -v eu-taxonomy-rag-hf-cache:/root/.cache/huggingface \
   eu-taxonomy-rag
 ```
 
