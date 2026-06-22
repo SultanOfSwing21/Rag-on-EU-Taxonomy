@@ -6,12 +6,17 @@ Small training RAG on the EU Taxonomy FAQs. The goal is to design and implement 
 
 **Requirements:** Python 3.10–3.12
 
-### Option A — two commands (recommended)
+### Option A (recommended)
 
 ```bash
+py -3.11 -m venv .venv
+.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
 pip install -e ".[ui]"
 eu-taxonomy-rag
 ```
+
+On macOS/Linux, activate the venv with `source .venv/bin/activate` instead of the PowerShell line above.
 
 ### Option B — one command
 
@@ -27,16 +32,20 @@ The launcher will automatically:
 
 On first use, open the **Benchmark** page and click **Build indexes** to create retrieval indexes (BM25 + dense). This step downloads embedding models and may take several minutes; later runs reuse `.cache/index/`.
 
-### LLM credentials (Chatbot tab only)
+### LLM credentials (Chatbot tab only, optional)
 
-Copy the example env file and add at least one provider:
+No `.env` file is required to start the app. Benchmark, interactive test, and data explorer work without any LLM key.
+
+To use the **Chatbot** tab, either:
+
+- copy the template and add a provider key:
 
 ```bash
 cp .env.example .env
 # then edit .env with your API key(s)
 ```
 
-Retrieval benchmark, interactive tests, and data explorer work without any LLM key.
+- or enter credentials in the UI and click **Save credentials to .env** (the app creates `.env` on first save).
 
 ### Optional extras
 
@@ -112,5 +121,5 @@ When disabled, the chatbot still retrieves and generates answers normally.
 ```bash
 pip install -e ".[ui,dev]"
 pytest
-eu-taxonomy-rag --bootstrap-only   # rebuild chunks/indexes without opening the UI
+eu-taxonomy-rag --bootstrap-only   # rebuild FAQ chunks without opening the UI
 ```
