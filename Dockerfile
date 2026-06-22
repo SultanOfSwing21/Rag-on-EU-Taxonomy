@@ -10,8 +10,13 @@
 #   /root/.cache/huggingface         modèles téléchargés (volume nommé hf-cache)
 #
 # Démarrage : docker compose up --build  →  http://localhost:8501
+#
+# PyTorch CPU-only (index pytorch.org) : pas de paquets NVIDIA CUDA dans l'image Docker.
+# L'installation locale via pyproject.toml reste inchangée (pip / GPU selon l'environnement hôte).
 
 FROM python:3.11-slim
+
+ARG TORCH_VERSION=2.2.2
 
 WORKDIR /app
 
@@ -31,6 +36,7 @@ RUN mkdir -p src/eu_taxonomy_rag \
 
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install --upgrade pip \
+    && pip install "torch==${TORCH_VERSION}" --index-url https://download.pytorch.org/whl/cpu \
     && pip install -e ".[ui]"
 
 # Layer 2 — application source (code changes do not reinstall Python dependencies)
