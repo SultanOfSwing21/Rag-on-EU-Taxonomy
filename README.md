@@ -76,10 +76,8 @@ Le dépôt inclut un `Dockerfile` et un `docker-compose.yml`.
 git clone <url-du-repo>
 cd "RAG - Implementation"
 
-# Optionnel : clés LLM pour l'onglet Chatbot
-cp .env.example .env
-# éditez .env si nécessaire
-# puis décommentez env_file dans docker-compose.yml
+# Optionnel : clés LLM pour l'onglet Chatbot (créé aussi via l'UI)
+# créez un fichier .env à la racine si besoin
 
 docker compose up --build
 ```
@@ -124,13 +122,9 @@ eu-taxonomy-rag --force-rebuild       # reconstruit les chunks depuis le fichier
 
 Pour l'onglet **Chatbot**, fournissez une clé API via l'une des options suivantes :
 
-1. Copier le modèle et renseigner vos clés :
+1. Saisir les identifiants dans l'interface et cliquer sur **Save credentials to .env** (le fichier `.env` est créé à la première sauvegarde).
 
-   ```bash
-   cp .env.example .env
-   ```
-
-2. Saisir les identifiants dans l'interface et cliquer sur **Save credentials to .env** (le fichier `.env` est créé à la première sauvegarde).
+2. Créer manuellement un fichier `.env` à la racine du projet avec vos clés (par ex. `OPENAI_API_KEY=...`).
 
 Providers supportés : OpenAI, Azure OpenAI, AWS Bedrock, API compatible OpenAI.
 
@@ -208,7 +202,7 @@ ENABLE_GENERATION_EVAL=false  # désactive l'évaluation NLI et les écritures S
 | `EU_TAXONOMY_LLM_MODEL` | Modèle LLM | `gpt-4o-mini` |
 | `OPENAI_API_KEY` | Clé OpenAI | — |
 
-Voir `.env.example` pour la liste complète des paramètres chatbot.
+Les paramètres chatbot (`EU_TAXONOMY_*`) peuvent aussi être définis dans `.env` ou saisis dans l'UI.
 
 ## Arborescence
 

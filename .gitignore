@@ -150,7 +150,7 @@ activemq-data/
 # Environments
 .env
 .env.*
-!.env.example
+.env.example
 .envrc
 .venv
 env/
@@ -222,5 +222,8 @@ __marimo__/
 # Instructions locales (objectifs, notes de dev)
 Instructions/
 
-# Cache local (chunks, index, etc.)
+# Cache local et artefacts générés (ne pas versionner)
 .cache/
+.cache/chunks.jsonl
+.cache/index/
+data/evaluation/results/
