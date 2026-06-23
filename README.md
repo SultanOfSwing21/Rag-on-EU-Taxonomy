@@ -1,20 +1,20 @@
 # EU Taxonomy RAG
 
-Application de question-réponse basée sur un pipeline **RAG** (Retrieval-Augmented Generation) pour les [FAQ officielles de l'EU Taxonomy Navigator](https://ec.europa.eu/sustainable-finance-taxonomy/faq).
+Question-answering application built on a **RAG** (Retrieval-Augmented Generation) pipeline for the [official EU Taxonomy Navigator FAQs](https://ec.europa.eu/sustainable-finance-taxonomy/faq).
 
-L'objectif est de fournir des réponses **traçables et ancrées dans la source** : chaque réponse s'appuie uniquement sur les chunks FAQ récupérés, avec des métriques pour mesurer la qualité du retrieval et la fidélité des réponses générées.
+The goal is to provide **traceable, source-grounded answers**: each response relies only on retrieved FAQ chunks, with metrics to measure retrieval quality and the faithfulness of generated answers.
 
 ---
 
-## Contexte
+## Context
 
-L'EU Taxonomy est un cadre réglementaire européen. Les FAQ associées constituent une base de connaissance structurée (324 entrées question-réponse) où chaque unité est conçue pour être lue indépendamment.
+The EU Taxonomy is a European regulatory framework. The associated FAQs form a structured knowledge base (324 question–answer entries), where each unit is designed to be read independently.
 
-Ce projet propose un assistant qui :
+This project provides an assistant that:
 
-- répond à **une question isolée à la fois** (pas de mémoire conversationnelle) ;
-- limite le scope aux FAQ fournies (pas de connaissance externe) ;
-- permet de **comparer et mesurer** différentes approches de retrieval et de génération.
+- answers **one isolated question at a time** (no conversational memory);
+- limits scope to the provided FAQs (no external knowledge);
+- enables **comparison and measurement** of different retrieval and generation approaches.
 
 ---
 
@@ -27,7 +27,7 @@ flowchart TB
     end
 
     subgraph Ingestion
-        Parser["Parser Markdown"]
+        Parser["Markdown parser"]
         Chunker["1 FAQ = 1 chunk"]
         ChunkCache[(".cache/chunks.jsonl")]
     end
@@ -73,48 +73,48 @@ flowchart TB
 
 ---
 
-## Principes de conception
+## Design principles
 
-| Principe | Description |
-|----------|-------------|
-| **1 FAQ = 1 chunk** | Chaque entrée officielle reste une unité indivisible pour éviter des réponses incomplètes ou mélangées. |
-| **Retrieval avant génération** | On mesure d'abord la capacité à retrouver les bons chunks, puis on évalue la fidélité des réponses. |
-| **Comparaison multi-méthodes** | BM25, recherche dense et hybride (fusion RRF) sont benchmarkées sur les mêmes jeux de données. |
-| **Deux jeux d'évaluation** | Golden dataset reproductible + requêtes « naturelles » (personas métier) pour tester le réalisme. |
-| **Groundedness diagnostique** | Évaluation NLI locale des affirmations générées, avec persistance pour suivre l'évolution des KPI. |
-| **Livrable autonome** | Benchmark, tests interactifs et exploration des données fonctionnent **sans clé API LLM**. |
-
----
-
-## Fonctionnalités
-
-| Page Streamlit | Rôle |
-|----------------|------|
-| **Home** | Accueil — présentation du projet et accès rapide aux fonctionnalités |
-| **Chatbot** | Q&R RAG single-turn + évaluation de faithfulness |
-| **Benchmark** | Évaluation retrieval (Recall@K, MRR), build d'index, export JSON |
-| **Interactive test** | Comparaison côte à côte des méthodes de retrieval |
-| **Data explorer** | Exploration des chunks et jeux d'évaluation |
-| **Documentation** | Choix d'architecture, méthodologie et métriques (parcours guidé) |
+| Principle | Description |
+|-----------|-------------|
+| **1 FAQ = 1 chunk** | Each official entry stays an indivisible unit to avoid incomplete or mixed answers. |
+| **Retrieval before generation** | Measure the ability to find the right chunks first, then evaluate answer faithfulness. |
+| **Multi-method comparison** | BM25, dense search, and hybrid (RRF fusion) are benchmarked on the same datasets. |
+| **Two evaluation datasets** | Reproducible golden dataset + “natural” queries (business personas) to test realism. |
+| **Diagnostic groundedness** | Local NLI evaluation of generated claims, with persistence to track KPI trends over time. |
+| **Self-contained deliverable** | Benchmark, interactive tests, and data exploration work **without an LLM API key**. |
 
 ---
 
-## Prérequis
+## Features
 
-- **Python 3.10, 3.11 ou 3.12** (recommandé : 3.11)
+| Streamlit page | Purpose |
+|----------------|---------|
+| **Home** | Welcome — project overview and quick access to features |
+| **Chatbot** | Single-turn RAG Q&A + faithfulness evaluation |
+| **Benchmark** | Retrieval evaluation (Recall@K, MRR), index build, JSON export |
+| **Interactive test** | Side-by-side comparison of retrieval methods |
+| **Data explorer** | Browse chunks and evaluation datasets |
+| **Documentation** | Architecture choices, methodology, and metrics (guided walkthrough) |
+
+---
+
+## Prerequisites
+
+- **Python 3.10, 3.11, or 3.12** (recommended: 3.11)
 - **Git**
-- Connexion internet au premier lancement (téléchargement des modèles d'embedding et, optionnellement, du modèle NLI)
+- Internet connection on first launch (downloads embedding models and, optionally, the NLI model)
 
-Aucune clé API n'est requise pour démarrer. Les onglets Benchmark, Interactive test, Data explorer et Documentation fonctionnent sans LLM.
+No API key is required to get started. The Benchmark, Interactive test, Data explorer, and Documentation tabs work without an LLM.
 
 ---
 
-## Installation locale
+## Local installation
 
 ### Windows (PowerShell)
 
 ```powershell
-git clone <url-du-repo>
+git clone <repo-url>
 cd "RAG - Implementation"
 
 py -3.11 -m venv .venv
@@ -127,7 +127,7 @@ eu-taxonomy-rag
 ### macOS / Linux
 
 ```bash
-git clone <url-du-repo>
+git clone <repo-url>
 cd "RAG - Implementation"
 
 python3.11 -m venv .venv
@@ -137,7 +137,7 @@ pip install -e ".[ui]"
 eu-taxonomy-rag
 ```
 
-### Une seule commande (macOS / Linux)
+### One-liner (macOS / Linux)
 
 ```bash
 chmod +x scripts/start.sh
@@ -146,129 +146,131 @@ chmod +x scripts/start.sh
 
 ---
 
-## Installation Docker
+## Docker installation
 
 ```bash
-git clone <url-du-repo>
+git clone <repo-url>
 cd "RAG - Implementation"
 docker compose up --build
 ```
 
-Ouvrez [http://localhost:8501](http://localhost:8501).
+Open [http://localhost:8501](http://localhost:8501).
 
-Les données générées sont persistées sur le disque local via des volumes bind :
+Generated data is persisted on the local disk via bind mounts:
 
-| Chemin hôte | Contenu |
-|-------------|---------|
-| `./.cache` | Chunks FAQ, index BM25/dense, base SQLite `generation_eval.db` |
-| `./data/evaluation/results` | Exports JSON des benchmarks retrieval |
+| Host path | Contents |
+|-----------|----------|
+| `./.cache` | FAQ chunks, BM25/dense indexes, SQLite `generation_eval.db` |
+| `./data/evaluation/results` | Retrieval benchmark JSON exports |
 
-Les modèles Hugging Face sont mis en cache dans le volume Docker nommé `eu-taxonomy-rag_hf-cache`.
+Hugging Face models are cached in the named Docker volume `eu-taxonomy-rag_hf-cache`.
 
-> **Important :** montez le volume sur le répertoire `.cache`, pas sur le fichier `generation_eval.db`.
+> **Important:** mount the volume on the `.cache` directory, not on the `generation_eval.db` file.
+
+The Docker image uses **CPU-only PyTorch** (no NVIDIA CUDA packages). Aligns with `EU_TAXONOMY_EMBEDDING_DEVICE=cpu` in `docker-compose.yml`.
 
 ---
 
-## Premier lancement
+## First launch
 
-1. Construction des **chunks** depuis `data/taxonomy_faqs_cleaned.md` → `.cache/chunks.jsonl`
-2. Initialisation de la base SQLite d'évaluation → `.cache/generation_eval.db`
-3. Ouverture du tableau de bord Streamlit
+1. Build **chunks** from `data/taxonomy_faqs_cleaned.md` → `.cache/chunks.jsonl`
+2. Initialize the evaluation SQLite database → `.cache/generation_eval.db`
+3. Open the Streamlit dashboard
 
-Ensuite : onglet **Benchmark** → **Build indexes** (BM25 + dense). Cette étape télécharge les modèles d'embedding ; les lancements suivants réutilisent le cache.
+Then: **Benchmark** tab → **Build indexes** (BM25 + dense). This step downloads embedding models; subsequent runs reuse the cache.
 
 ```bash
-eu-taxonomy-rag --bootstrap-only      # prépare les chunks sans ouvrir l'UI
-eu-taxonomy-rag --force-rebuild       # reconstruit les chunks depuis la source
+eu-taxonomy-rag --bootstrap-only      # prepare chunks without opening the UI
+eu-taxonomy-rag --force-rebuild       # rebuild chunks from source
 ```
 
 ---
 
-## Clés LLM (onglet Chatbot, optionnel)
+## LLM keys (Chatbot tab, optional)
 
-Pour l'onglet **Chatbot** :
+For the **Chatbot** tab:
 
-1. Saisir les identifiants dans l'interface → **Save credentials to .env**
-2. Ou créer un fichier `.env` à la racine (ex. `OPENAI_API_KEY=...`)
+1. Enter credentials in the UI → **Save credentials to .env**
+2. Or create a `.env` file at the project root (e.g. `OPENAI_API_KEY=...`)
 
-Providers supportés : OpenAI, Azure OpenAI, AWS Bedrock, API compatible OpenAI.
+Supported providers: OpenAI, Azure OpenAI, AWS Bedrock, OpenAI-compatible API.
 
 ---
 
-## Évaluation
+## Evaluation
 
 ### Retrieval
 
-Métriques : **Recall@1**, **Recall@3**, **Recall@5**, **MRR**.
+Metrics: **Recall@1**, **Recall@3**, **Recall@5**, **MRR**.
 
-Deux jeux de données :
+Two datasets:
 
-- `retrieval_golden_dataset_cleaned.jsonl` — benchmark reproductible (paraphrases + questions multi-chunks)
-- `natural_user_queries_748.jsonl` — requêtes réécrites avec personas métier (sustainability officer, finance, etc.)
+- `retrieval_golden_dataset_cleaned.jsonl` — reproducible benchmark (paraphrases + multi-chunk questions)
+- `natural_user_queries_748.jsonl` — queries rewritten with business personas (sustainability officer, finance, etc.)
 
-Résultats exportables en JSON depuis l'onglet Benchmark.
+Results can be exported as JSON from the Benchmark tab.
 
-### Génération (faithfulness / groundedness)
+### Generation (faithfulness / groundedness)
 
-Après chaque réponse LLM :
+After each LLM response:
 
-1. Découpage en affirmations courtes
-2. Vérification NLI contre les chunks récupérés (`typeform/distilbert-base-uncased-mnli`)
-3. Étiquetage : `supported`, `contradicted`, `not_enough_info`
-4. Persistance SQLite pour suivi dans le temps (onglets **History** et **Metrics** du Chatbot)
+1. Split into short claims
+2. NLI verification against retrieved chunks (`typeform/distilbert-base-uncased-mnli`)
+3. Labels: `supported`, `contradicted`, `not_enough_info`
+4. SQLite persistence for tracking over time (Chatbot **History** and **Metrics** tabs)
 
-| Métrique | Signification |
-|----------|---------------|
+| Metric | Meaning |
+|--------|---------|
 | **Faithfulness** | `supported_claims / total_claims` |
-| **Contradiction rate** | Part des affirmations contredites |
-| **Unsupported rate** | Part sans information suffisante |
+| **Contradiction rate** | Share of contradicted claims |
+| **Unsupported rate** | Share with insufficient information |
 
-Outil de **diagnostic**, pas un juge automatique parfait. Désactivable via `ENABLE_GENERATION_EVAL=false`.
+A **diagnostic** tool, not a perfect automatic judge. Disable with `ENABLE_GENERATION_EVAL=false`.
 
 ---
 
-## Stack technique
+## Tech stack
 
-| Composant | Technologie |
-|-----------|-------------|
-| Langage | Python 3.10–3.12 |
+| Component | Technology |
+|-----------|------------|
+| Language | Python 3.10–3.12 |
 | Embeddings | sentence-transformers (MiniLM, MPNet) |
 | Lexical | BM25 (`bm25s`) |
-| Index dense | NumPy (défaut) ou FAISS (optionnel) |
+| Dense index | NumPy (default) or FAISS (optional) |
 | LLM | OpenAI SDK (multi-provider) |
 | Faithfulness | Transformers NLI (DistilBERT-MNLI) |
 | UI | Streamlit |
-| Persistance | JSONL cache, SQLite, exports JSON |
-| Conteneurisation | Docker + docker-compose |
+| Persistence | JSONL cache, SQLite, JSON exports |
+| Containerization | Docker + docker-compose |
 
 ---
 
-## Arborescence
+## Project structure
 
 ```
 app/
-  streamlit_app.py        # tableau de bord principal
-  chatbot_page.py         # chatbot RAG
-  documentation_page.py   # documentation in-app
-  generation_eval_ui.py   # UI faithfulness
+  streamlit_app.py        # main dashboard
+  chatbot_page.py         # RAG chatbot
+  documentation_page.py   # in-app documentation
+  generation_eval_ui.py   # faithfulness UI
 src/eu_taxonomy_rag/
-  cli.py                  # bootstrap + lancement Streamlit
+  cli.py                  # bootstrap + Streamlit launch
   core/                   # parser, chunker, prompt
   retrieval/              # BM25, dense, hybrid, retriever
   pipelines/              # ingestion, RAG, index manager
-  evaluation/             # benchmarks, métriques, NLI
-  storage/                # persistance SQLite
+  evaluation/             # benchmarks, metrics, NLI
+  storage/                # SQLite persistence
 data/
   taxonomy_faqs_cleaned.md
-  evaluation/             # jeux golden et natural queries
-docs/                     # documentation détaillée (chunking, datasets)
-  documentation/          # sections affichées dans l'onglet Documentation
-.cache/                   # chunks, index, base d'évaluation (généré)
+  evaluation/             # golden and natural query datasets
+docs/                     # detailed documentation (chunking, datasets)
+  documentation/          # sections shown in the Documentation tab
+.cache/                   # chunks, indexes, evaluation DB (generated)
 ```
 
 ---
 
-## Développement
+## Development
 
 ```bash
 pip install -e ".[ui,dev]"
@@ -276,41 +278,41 @@ pytest
 eu-taxonomy-rag --bootstrap-only
 ```
 
-Extras optionnels : `faiss` (index dense FAISS), `dev` (pytest).
+Optional extras: `faiss` (FAISS dense index), `dev` (pytest).
 
 ---
 
-## Limites connues & évolutions possibles
+## Known limitations & possible improvements
 
-| Limite actuelle | Évolution possible |
-|-----------------|-------------------|
-| Corpus fermé (324 FAQs) | Ingestion multi-sources, mise à jour incrémentale |
-| Single-turn (pas de mémoire) | Historique conversationnel avec fenêtre de contexte |
-| Pas de reranking cross-encoder | Reranker après fusion hybride |
-| Index local (NumPy/FAISS) | Vector DB managée (pgvector, OpenSearch…) |
-| NLI léger sur CPU | RAGAS / éval end-to-end, modèles plus robustes |
-| Pas d'observabilité distribuée | Tracing (Langfuse, OpenTelemetry) |
-
----
-
-## Documentation complémentaire
-
-- **In-app** : onglet **Documentation** du tableau de bord Streamlit (fichiers dans `docs/documentation/`)
-- **Dépôt** : `docs/chunking.md`, `docs/golden_dataset.md`, `docs/natural_dataset.md`
+| Current limitation | Possible improvement |
+|------------------|----------------------|
+| Closed corpus (324 FAQs) | Multi-source ingestion, incremental updates |
+| Single-turn (no memory) | Conversational history with context window |
+| No cross-encoder reranking | Reranker after hybrid fusion |
+| Local index (NumPy/FAISS) | Managed vector DB (pgvector, OpenSearch…) |
+| Lightweight NLI on CPU | RAGAS / end-to-end eval, more robust models |
+| No distributed observability | Tracing (Langfuse, OpenTelemetry) |
 
 ---
 
-## Dépannage
+## Additional documentation
 
-| Problème | Piste de résolution |
-|----------|---------------------|
-| `unable to open database file` | Droits d'écriture sur `.cache` ; en Docker, monter un volume sur `.cache` |
-| FAQ introuvable en Docker | `EU_TAXONOMY_PROJECT_ROOT=/app` |
-| `sentence-transformers` / torch | Python 3.10–3.12 ; éviter 3.13+ |
-| Port 8501 occupé | Changer le mapping port dans `docker-compose.yml` |
+- **In-app**: **Documentation** tab in the Streamlit dashboard (files in `docs/documentation/`)
+- **Repository**: `docs/chunking.md`, `docs/golden_dataset.md`, `docs/natural_dataset.md`
 
 ---
 
-## Licence
+## Troubleshooting
 
-Voir [LICENSE](LICENSE).
+| Issue | Suggested fix |
+|-------|---------------|
+| `unable to open database file` | Write permissions on `.cache`; in Docker, mount a volume on `.cache` |
+| FAQ not found in Docker | `EU_TAXONOMY_PROJECT_ROOT=/app` |
+| `sentence-transformers` / torch | Python 3.10–3.12; avoid 3.13+ |
+| Port 8501 in use | Change the port mapping in `docker-compose.yml` |
+
+---
+
+## License
+
+See [LICENSE](LICENSE).
